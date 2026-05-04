@@ -66,6 +66,7 @@ import com.simon.harmonichackernews.utils.AccountUtils;
 import com.simon.harmonichackernews.utils.FontUtils;
 import com.simon.harmonichackernews.utils.HistoriesUtils;
 import com.simon.harmonichackernews.utils.SettingsUtils;
+import com.simon.harmonichackernews.utils.SearchRelevanceUtils;
 import com.simon.harmonichackernews.utils.StoryUpdate;
 import com.simon.harmonichackernews.utils.Utils;
 import com.simon.harmonichackernews.utils.UtilsKt;
@@ -101,6 +102,7 @@ public class StoriesFragment extends Fragment {
     private Chip searchDateChip;
     private Chip searchPointsChip;
     private Chip searchCommentsChip;
+    private Chip searchOnlyClickedChip;
     private ImageButton searchButton;
     private ImageButton closeSearchButton;
     private ImageButton moreButton;
@@ -131,6 +133,7 @@ public class StoriesFragment extends Fragment {
     private int searchDateRangeIndex = 0;
     private int searchMinimumPointsIndex = 0;
     private int searchMinimumCommentsIndex = 0;
+    private boolean searchOnlyClicked = false;
     private int algoliaRequestGeneration = 0;
     private boolean algoliaLoading = false;
     private String activeAlgoliaUrl = null;
@@ -221,6 +224,7 @@ public class StoriesFragment extends Fragment {
         searchDateChip = view.findViewById(R.id.stories_header_search_date_chip);
         searchPointsChip = view.findViewById(R.id.stories_header_search_points_chip);
         searchCommentsChip = view.findViewById(R.id.stories_header_search_comments_chip);
+        searchOnlyClickedChip = view.findViewById(R.id.stories_header_search_only_clicked_chip);
         searchBar.setElevation(0f);
         searchEditText.bringToFront();
         searchButton = view.findViewById(R.id.stories_header_search_button);
@@ -442,6 +446,11 @@ public class StoriesFragment extends Fragment {
             updateSearchOptionChips();
             retrySearchWithCurrentOptions();
         }));
+        searchOnlyClickedChip.setOnClickListener(v -> {
+            searchOnlyClicked = !searchOnlyClicked;
+            updateSearchOptionChips();
+            retrySearchWithCurrentOptions();
+        });
         updateSearchOptionChips();
 
         searchButton.setOnClickListener(view -> openSearch());
@@ -632,11 +641,15 @@ public class StoriesFragment extends Fragment {
         searchDateChip.setText(SEARCH_DATE_RANGE_LABELS[searchDateRangeIndex]);
         searchPointsChip.setText(SEARCH_MINIMUM_POINTS_LABELS[searchMinimumPointsIndex]);
         searchCommentsChip.setText(SEARCH_MINIMUM_COMMENTS_LABELS[searchMinimumCommentsIndex]);
+        searchOnlyClickedChip.setChecked(searchOnlyClicked);
 
         searchSortChip.setContentDescription("Search sort: " + SEARCH_SORT_LABELS[searchSortIndex]);
         searchDateChip.setContentDescription("Search date range: " + SEARCH_DATE_RANGE_LABELS[searchDateRangeIndex]);
         searchPointsChip.setContentDescription("Search minimum points: " + SEARCH_MINIMUM_POINTS_LABELS[searchMinimumPointsIndex]);
         searchCommentsChip.setContentDescription("Search minimum comments: " + SEARCH_MINIMUM_COMMENTS_LABELS[searchMinimumCommentsIndex]);
+        searchOnlyClickedChip.setContentDescription(searchOnlyClicked
+                ? "From history search enabled"
+                : "From history search disabled");
     }
 
     private void beginSearchOptionsTransition() {
@@ -734,6 +747,7 @@ public class StoriesFragment extends Fragment {
         searchDateRangeIndex = 0;
         searchMinimumPointsIndex = 0;
         searchMinimumCommentsIndex = 0;
+        searchOnlyClicked = false;
         updateSearchOptionChips(false);
         resetSearchOptionsScroll();
     }
@@ -948,8 +962,7 @@ public class StoriesFragment extends Fragment {
 
             Story story = stories.get(position);
             if (story.loaded) {
-                story.clicked = true;
-                HistoriesUtils.INSTANCE.addHistory(requireContext(), story.id);
+                markStoryClicked(story);
 
                 if (story.isLink) {
                     if (SettingsUtils.shouldUseIntegratedWebView(getContext())) {
@@ -1187,6 +1200,21 @@ public class StoriesFragment extends Fragment {
 
         historiesChangeVersion = currentHistoriesChangeVersion;
 
+        if (searching && searchOnlyClicked) {
+            boolean clickedStateChanged = false;
+            for (Story story : stories) {
+                if (story.clicked) {
+                    story.clicked = false;
+                    clickedStateChanged = true;
+                }
+            }
+
+            if (clickedStateChanged) {
+                adapter.notifyItemRangeChanged(0, adapter.getItemCount());
+            }
+            return;
+        }
+
         if (adapter.type == SettingsUtils.getHistoryIndex(getResources())) {
             attemptRefresh();
             return;
@@ -1234,13 +1262,19 @@ public class StoriesFragment extends Fragment {
 
         Story story = stories.get(position);
         if (story.loaded) {
-            story.clicked = true;
-            HistoriesUtils.INSTANCE.addHistory(requireContext(), story.id);
+            markStoryClicked(story);
 
             openComments(story, position, false);
 
             adapter.notifyItemChanged(position);
         }
+    }
+
+    private void markStoryClicked(Story story) {
+        if (!searchOnlyClicked) {
+            story.clicked = true;
+        }
+        HistoriesUtils.INSTANCE.addHistory(requireContext(), story.id);
     }
 
     private void loadStory(Story story, final int attempt) {
@@ -1574,6 +1608,11 @@ public class StoriesFragment extends Fragment {
     private void search(String query) {
         lastSearch = query;
 
+        if (searchOnlyClicked) {
+            loadOnlyClickedSearch(query);
+            return;
+        }
+
         String endpoint = searchSortIndex == 0
                 ? "https://hn.algolia.com/api/v1/search"
                 : "https://hn.algolia.com/api/v1/search_by_date";
@@ -1605,6 +1644,172 @@ public class StoriesFragment extends Fragment {
         }
 
         loadAlgolia(builder.build().toString());
+    }
+
+    private void loadOnlyClickedSearch(String query) {
+        invalidateAlgoliaLoad();
+        final int requestGeneration = algoliaRequestGeneration;
+        algoliaLoading = true;
+        activeAlgoliaUrl = null;
+        loadingFailed = false;
+        loadingFailedServerError = false;
+        showingCached = false;
+        queue.cancelAll(requestTag);
+
+        if (!stories.isEmpty()) {
+            clearStories();
+        }
+
+        List<History> histories = UtilsKt.INSTANCE.loadHistories(requireContext(), true);
+        if (histories.isEmpty()) {
+            completeOnlyClickedSearch(requestGeneration, new ArrayList<>(), 0, 0);
+            return;
+        }
+
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
+        int minimumTime = getSearchMinimumTimeSeconds();
+        int minimumPoints = SEARCH_MINIMUM_POINTS[searchMinimumPointsIndex];
+        int minimumComments = SEARCH_MINIMUM_COMMENTS[searchMinimumCommentsIndex];
+        List<Story> matchedStories = new ArrayList<>(histories.size());
+        for (int i = 0; i < histories.size(); i++) {
+            matchedStories.add(null);
+        }
+
+        final int[] pendingRequests = new int[]{histories.size()};
+        final int[] failedRequests = new int[]{0};
+
+        for (int i = 0; i < histories.size(); i++) {
+            History history = histories.get(i);
+            final int storyIndex = i;
+            Story story = new Story("Loading...", history.getId(), false, false);
+            String url = "https://hacker-news.firebaseio.com/v0/item/" + history.getId() + ".json";
+            StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                    response -> {
+                        if (requestGeneration != algoliaRequestGeneration) {
+                            return;
+                        }
+
+                        try {
+                            if (JSONParser.updateStoryWithHNJson(response, story, false)
+                                    && shouldIncludeOnlyClickedSearchStory(story, normalizedQuery, minimumTime, minimumPoints, minimumComments)) {
+                                matchedStories.set(storyIndex, story);
+                            }
+                        } catch (JSONException e) {
+                            failedRequests[0]++;
+                            e.printStackTrace();
+                        }
+
+                        finishOnlyClickedSearchRequest(requestGeneration, pendingRequests, failedRequests, matchedStories);
+                    }, error -> {
+                if (requestGeneration != algoliaRequestGeneration) {
+                    return;
+                }
+
+                failedRequests[0]++;
+                error.printStackTrace();
+                finishOnlyClickedSearchRequest(requestGeneration, pendingRequests, failedRequests, matchedStories);
+            });
+
+            stringRequest.setShouldCache(false);
+            stringRequest.setTag(requestTag);
+            queue.add(stringRequest);
+        }
+
+        updateHeader();
+    }
+
+    private int getSearchMinimumTimeSeconds() {
+        int days = SEARCH_DATE_RANGE_DAYS[searchDateRangeIndex];
+        if (days <= 0) {
+            return 0;
+        }
+
+        return (int) ((System.currentTimeMillis() / 1000L) - (days * 24L * 60L * 60L));
+    }
+
+    private boolean shouldIncludeOnlyClickedSearchStory(Story story,
+                                                        String normalizedQuery,
+                                                        int minimumTime,
+                                                        int minimumPoints,
+                                                        int minimumComments) {
+        if (story.title == null || !story.title.toLowerCase().contains(normalizedQuery)) {
+            return false;
+        }
+
+        if (minimumTime > 0 && story.time < minimumTime) {
+            return false;
+        }
+
+        if (minimumPoints > 0 && story.score < minimumPoints) {
+            return false;
+        }
+
+        if (minimumComments > 0 && story.descendants < minimumComments) {
+            return false;
+        }
+
+        if (filterWords != null) {
+            for (String phrase : filterWords) {
+                if (story.title.toLowerCase().contains(phrase.toLowerCase())) {
+                    return false;
+                }
+            }
+        }
+
+        if (filterDomains != null) {
+            for (String phrase : filterDomains) {
+                try {
+                    String domain = Utils.getDomainName(story.url);
+                    if (domain.toLowerCase().contains(phrase.toLowerCase())) {
+                        return false;
+                    }
+                } catch (Exception e) {
+                    // Nothing
+                }
+            }
+        }
+
+        return !shouldHideStoryAsJob(story);
+    }
+
+    private void finishOnlyClickedSearchRequest(int requestGeneration,
+                                                int[] pendingRequests,
+                                                int[] failedRequests,
+                                                List<Story> matchedStories) {
+        pendingRequests[0]--;
+        if (pendingRequests[0] > 0 || requestGeneration != algoliaRequestGeneration) {
+            return;
+        }
+
+        ArrayList<Story> finishedStories = new ArrayList<>();
+        for (Story story : matchedStories) {
+            if (story != null) {
+                finishedStories.add(story);
+            }
+        }
+        if (searchSortIndex == 0) {
+            SearchRelevanceUtils.sortStoriesByRelevance(finishedStories, lastSearch);
+        }
+
+        completeOnlyClickedSearch(requestGeneration, finishedStories, failedRequests[0], matchedStories.size());
+    }
+
+    private void completeOnlyClickedSearch(int requestGeneration,
+                                           List<Story> finishedStories,
+                                           int failedRequests,
+                                           int totalRequests) {
+        if (requestGeneration != algoliaRequestGeneration) {
+            return;
+        }
+
+        algoliaLoading = false;
+        activeAlgoliaUrl = null;
+        swipeRefreshLayout.setRefreshing(false);
+        loadingFailed = totalRequests > 0 && failedRequests == totalRequests;
+        loadingFailedServerError = false;
+        replaceStories(finishedStories);
+        loadedTo = stories.size() - 1;
+        updateHeader();
     }
 
     private void loadAlgolia(String url) {
