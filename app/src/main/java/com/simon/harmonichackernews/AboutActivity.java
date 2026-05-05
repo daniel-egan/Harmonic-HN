@@ -60,9 +60,11 @@ public class AboutActivity extends AppCompatActivity {
         String versionText = "Version " + BuildConfig.VERSION_NAME;
         if (BuildConfig.DEBUG) {
             versionText += String.format(" (%s)", BuildConfig.BUILD_TYPE);
+            binding.aboutDebugDivider.setVisibility(View.VISIBLE);
             binding.aboutDebugLink.setVisibility(View.VISIBLE);
             binding.aboutDebugPoll.setVisibility(View.VISIBLE);
             binding.aboutDebugWelcome.setVisibility(View.VISIBLE);
+            binding.aboutDebugNotifications.setVisibility(View.VISIBLE);
         }
         binding.aboutVersion.setText(versionText);
     }
@@ -88,18 +90,18 @@ public class AboutActivity extends AppCompatActivity {
     }
 
     public void openDebugLink(View v) {
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setData(Uri.parse("https://news.ycombinator.com/item?id=47938725"));
-        startActivity(intent);
+        Utils.openLinkMaybeHN(this, "https://news.ycombinator.com/item?id=47938725");
     }
 
     public void openDebugPoll(View v) {
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setData(Uri.parse("https://news.ycombinator.com/item?id=39572682"));
-        startActivity(intent);
+        Utils.openLinkMaybeHN(this, "https://news.ycombinator.com/item?id=39572682");
     }
 
     public void openDebugWelcome(View v) {
         startActivity(new Intent(this, WelcomeActivity.class));
+    }
+
+    public void openDebugNotifications(View v) {
+        DebugNotificationsDialogFragment.show(getSupportFragmentManager());
     }
 }

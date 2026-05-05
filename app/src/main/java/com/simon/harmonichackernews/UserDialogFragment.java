@@ -4,8 +4,10 @@ import static android.view.View.GONE;
 import static com.simon.harmonichackernews.SubmissionsActivity.KEY_USER;
 
 import android.app.Dialog;
+import android.content.pm.PackageManager;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.SpannableString;
@@ -21,20 +23,26 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDialogFragment;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentManager;
 
 import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.StringRequest;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.loadingindicator.LoadingIndicator;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.textfield.TextInputEditText;
 import com.simon.harmonichackernews.network.NetworkComponent;
+import com.simon.harmonichackernews.network.RepliesChecker;
 import com.simon.harmonichackernews.utils.AccountUtils;
 import com.simon.harmonichackernews.utils.Utils;
 
@@ -64,13 +72,35 @@ public class UserDialogFragment extends AppCompatDialogFragment {
     private Button tagButton;
     private Button blockButton;
     private Button reportButton;
+    private MaterialButton notificationsButton;
+    private LinearProgressIndicator notificationsLoading;
+    private TextView notificationsStatus;
     private LoadingIndicator loadingProgress;
     private LinearLayout errorLayout;
     private LinearLayout container;
     private UserDialogCallback setTagCallback;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
+    private String pendingNotificationUsername;
+    private boolean notificationActionLoading;
 
     public void setCallback(UserDialogCallback callback) {
         this.setTagCallback = callback;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                granted -> {
+                    if (granted && !TextUtils.isEmpty(pendingNotificationUsername)) {
+                        activateNotifications(pendingNotificationUsername);
+                    } else {
+                        setNotificationsStatus("Notification permission denied.");
+                    }
+                    pendingNotificationUsername = null;
+                }
+        );
     }
 
     @NonNull
@@ -93,6 +123,9 @@ public class UserDialogFragment extends AppCompatDialogFragment {
         tagButton = rootView.findViewById(R.id.user_tag_button);
         reportButton = rootView.findViewById(R.id.user_report_button);
         blockButton = rootView.findViewById(R.id.user_block_button);
+        notificationsButton = rootView.findViewById(R.id.user_notifications_button);
+        notificationsLoading = rootView.findViewById(R.id.user_notifications_loading);
+        notificationsStatus = rootView.findViewById(R.id.user_notifications_status);
         loadingProgress = rootView.findViewById(R.id.user_loading);
         errorLayout = rootView.findViewById(R.id.user_error);
         Button retryButton = rootView.findViewById(R.id.user_retry);
@@ -165,10 +198,11 @@ public class UserDialogFragment extends AppCompatDialogFragment {
 
                             tagButton.setText("Set tag" + (TextUtils.isEmpty(currentTag) ? "" : " (" + currentTag + ")"));
 
-                            if (userName.equals(AccountUtils.getAccountUsername(getContext()))) {
+                            if (isOwnProfile(userName)) {
                                 reportButton.setVisibility(GONE);
                                 blockButton.setVisibility(GONE);
                                 tagButton.setVisibility(GONE);
+                                setupNotificationButton(userName);
                             } else {
                                 boolean isBlocked = Utils.getFilteredUsers(getContext()).contains(userName);
                                 blockButton.setText(isBlocked ? "Unblock" : "Block");
@@ -176,6 +210,9 @@ public class UserDialogFragment extends AppCompatDialogFragment {
                                 reportButton.setVisibility(View.VISIBLE);
                                 blockButton.setVisibility(View.VISIBLE);
                                 tagButton.setVisibility(View.VISIBLE);
+                                notificationsButton.setVisibility(GONE);
+                                notificationsLoading.setVisibility(GONE);
+                                notificationsStatus.setVisibility(GONE);
                             }
 
 
@@ -243,6 +280,86 @@ public class UserDialogFragment extends AppCompatDialogFragment {
         });
 
         return dialog;
+    }
+
+    private boolean isOwnProfile(String userName) {
+        return !TextUtils.isEmpty(userName)
+                && !TextUtils.isEmpty(AccountUtils.getAccountUsername(getContext()))
+                && userName.equalsIgnoreCase(AccountUtils.getAccountUsername(getContext()));
+    }
+
+    private void setupNotificationButton(String userName) {
+        notificationsButton.setVisibility(View.VISIBLE);
+        notificationsButton.setOnClickListener(v -> {
+            if (notificationsActiveForUser(userName)) {
+                RepliesChecker.disable(requireContext());
+                notificationActionLoading = false;
+                setNotificationsStatus("");
+                updateNotificationsButton(userName);
+            } else {
+                maybeActivateNotifications(userName);
+            }
+        });
+        updateNotificationsButton(userName);
+    }
+
+    private void maybeActivateNotifications(String userName) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(requireContext(), android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pendingNotificationUsername = userName;
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS);
+            return;
+        }
+
+        activateNotifications(userName);
+    }
+
+    private void activateNotifications(String userName) {
+        notificationActionLoading = true;
+        setNotificationsStatus("");
+        updateNotificationsButton(userName);
+        RepliesChecker.enable(requireContext(), userName, success -> {
+            if (getContext() == null) {
+                return;
+            }
+            notificationActionLoading = false;
+            if (success) {
+                setNotificationsStatus("");
+            } else {
+                setNotificationsStatus("Could not activate reply notifications.");
+            }
+            updateNotificationsButton(userName);
+        });
+    }
+
+    private boolean notificationsActiveForUser(String userName) {
+        return !TextUtils.isEmpty(userName)
+                && userName.equalsIgnoreCase(RepliesChecker.getConfiguredUsername(requireContext()));
+    }
+
+    private void updateNotificationsButton(String userName) {
+        if (notificationsButton == null || notificationsLoading == null) {
+            return;
+        }
+
+        boolean active = notificationsActiveForUser(userName);
+        notificationsButton.setText(active ? "Deactivate notifications" : "Activate notifications");
+        notificationsButton.setEnabled(!notificationActionLoading);
+        notificationsLoading.setVisibility(notificationActionLoading ? View.VISIBLE : GONE);
+    }
+
+    private void setNotificationsStatus(String status) {
+        if (notificationsStatus == null) {
+            return;
+        }
+
+        if (TextUtils.isEmpty(status)) {
+            notificationsStatus.setVisibility(GONE);
+            notificationsStatus.setText("");
+        } else {
+            notificationsStatus.setVisibility(View.VISIBLE);
+            notificationsStatus.setText(status);
+        }
     }
 
     private void showLoadedContent() {

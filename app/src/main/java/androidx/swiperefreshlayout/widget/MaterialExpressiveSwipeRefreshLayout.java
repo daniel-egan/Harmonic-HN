@@ -13,6 +13,8 @@ import com.google.android.material.loadingindicator.LoadingIndicator;
  * keeping the library's nested scrolling and refresh behavior.
  */
 public class MaterialExpressiveSwipeRefreshLayout extends SwipeRefreshLayout {
+    private static final int INDICATOR_CONTAINER_PADDING_DP = 5;
+
     private LoadingIndicator materialIndicator;
 
     public MaterialExpressiveSwipeRefreshLayout(Context context) {
@@ -50,11 +52,13 @@ public class MaterialExpressiveSwipeRefreshLayout extends SwipeRefreshLayout {
 
     private void useMaterialIndicator(Context context) {
         materialIndicator = new LoadingIndicator(context);
-        int indicatorSize = getProgressCircleDiameter();
+        int containerSize = getProgressCircleDiameter();
+        int indicatorPadding = Math.round(INDICATOR_CONTAINER_PADDING_DP * getResources().getDisplayMetrics().density);
+        int indicatorSize = Math.max(0, containerSize - (indicatorPadding * 2));
 
         materialIndicator.setIndicatorSize(indicatorSize);
-        materialIndicator.setContainerWidth(indicatorSize);
-        materialIndicator.setContainerHeight(indicatorSize);
+        materialIndicator.setContainerWidth(containerSize);
+        materialIndicator.setContainerHeight(containerSize);
         materialIndicator.setIndicatorColor(MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, 0));
         materialIndicator.setContainerColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurfaceContainerHigh, 0));
 

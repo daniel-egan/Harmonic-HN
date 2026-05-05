@@ -108,6 +108,40 @@
                 android:textColor="?attr/storyColorNormal"
                 tools:text="Submissions" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/user_notifications_button"
+                style="@style/Widget.Material3Expressive.Button.IconButton.Outlined"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:fontFamily="@font/product_sans_bold"
+                android:text="Activate notifications"
+                android:textColor="?attr/storyColorNormal"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:icon="@drawable/ic_action_notifications"
+                app:iconTint="?attr/storyColorNormal"
+                tools:visibility="visible" />
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/user_notifications_loading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:indeterminate="true"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/user_notifications_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="@font/product_sans"
+                android:textColor="?attr/storyColorDisabled"
+                android:textSize="13sp"
+                android:visibility="gone"
+                tools:text="Reply notifications are active." />
+
             <Button
                 android:fontFamily="@font/product_sans_bold"
                 app:icon="@drawable/ic_action_tag"
