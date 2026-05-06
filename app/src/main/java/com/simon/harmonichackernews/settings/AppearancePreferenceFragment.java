@@ -7,6 +7,7 @@ import com.google.android.material.timepicker.MaterialTimePicker;
 import com.google.android.material.timepicker.TimeFormat;
 import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.utils.SettingsUtils;
+import com.simon.harmonichackernews.utils.ThemeUtils;
 import com.simon.harmonichackernews.utils.Utils;
 
 import java.text.SimpleDateFormat;
@@ -30,13 +31,26 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
         changePrefStatus(findPreference("pref_theme_nighttime"), specialNighttime);
 
         findPreference("pref_special_nighttime").setOnPreferenceChangeListener((preference, newValue) -> {
-            changePrefStatus(findPreference("pref_theme_timed_range"), (boolean) newValue);
-            changePrefStatus(findPreference("pref_theme_nighttime"), (boolean) newValue);
+            boolean useSpecialNighttimeTheme = (boolean) newValue;
+            changePrefStatus(findPreference("pref_theme_timed_range"), useSpecialNighttimeTheme);
+            changePrefStatus(findPreference("pref_theme_nighttime"), useSpecialNighttimeTheme);
+            restartSettingsActivityIfThemeChanged(ThemeUtils.getPreferredTheme(
+                    requireContext(),
+                    useSpecialNighttimeTheme,
+                    getNighttimeTheme()));
             return true;
         });
 
         findPreference("pref_theme").setOnPreferenceChangeListener((preference, newValue) -> {
             restartSettingsActivity();
+            return true;
+        });
+
+        findPreference("pref_theme_nighttime").setOnPreferenceChangeListener((preference, newValue) -> {
+            restartSettingsActivityIfThemeChanged(ThemeUtils.getPreferredTheme(
+                    requireContext(),
+                    SettingsUtils.shouldUseSpecialNighttimeTheme(requireContext()),
+                    (String) newValue));
             return true;
         });
 
@@ -63,8 +77,10 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
                         .setTitleText("To:")
                         .build();
                 toTimePicker.addOnPositiveButtonClickListener(view2 -> {
+                    String previousTheme = ThemeUtils.getPreferredTheme(requireContext());
                     Utils.setNighttimeHours(fromTimePicker.getHour(), fromTimePicker.getMinute(), toTimePicker.getHour(), toTimePicker.getMinute(), getContext());
                     updateTimedRangeSummary();
+                    restartSettingsActivityIfThemeChanged(previousTheme, ThemeUtils.getPreferredTheme(requireContext()));
                 });
                 toTimePicker.show(getParentFragmentManager(), "to_picker_tag");
             });
@@ -87,6 +103,22 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
             Date dateFrom = new Date(0, 0, 0, nighttimeHours[0], nighttimeHours[1]);
             Date dateTo = new Date(0, 0, 0, nighttimeHours[2], nighttimeHours[3]);
             findPreference("pref_theme_timed_range").setSummary(df.format(dateFrom) + " - " + df.format(dateTo));
+        }
+    }
+
+    private String getNighttimeTheme() {
+        return getPreferenceManager()
+                .getSharedPreferences()
+                .getString("pref_theme_nighttime", "material_daynight");
+    }
+
+    private void restartSettingsActivityIfThemeChanged(String newTheme) {
+        restartSettingsActivityIfThemeChanged(ThemeUtils.getPreferredTheme(requireContext()), newTheme);
+    }
+
+    private void restartSettingsActivityIfThemeChanged(String oldTheme, String newTheme) {
+        if (!oldTheme.equals(newTheme)) {
+            restartSettingsActivity();
         }
     }
 }
