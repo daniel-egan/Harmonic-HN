@@ -31,6 +31,12 @@
             app:title="Clear clicked stories"
             app:icon="@drawable/ic_action_clear" />
 
+        <Preference
+            app:singleLineTitle="false"
+            app:key="pref_clear_post_cache"
+            app:title="Clear post cache"
+            app:icon="@drawable/ic_action_cache" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

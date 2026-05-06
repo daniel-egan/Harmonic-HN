@@ -211,6 +211,66 @@ public class Utils {
         return SettingsUtils.readStringFromSharedPreferences(ctx, KEY_SHARED_PREFERENCES_CACHED_STORY + id);
     }
 
+    public static int clearPostCache(Context ctx) {
+        if (ctx == null) {
+            return 0;
+        }
+
+        SharedPreferences sharedPreferences = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        Set<Integer> cachedPostIds = new HashSet<>();
+
+        Set<String> cachedStories = SettingsUtils.readStringSetFromSharedPreferences(ctx, KEY_SHARED_PREFERENCES_CACHED_STORIES_STRINGS);
+        if (cachedStories != null) {
+            for (String cachedStory : cachedStories) {
+                String[] idAndDate = cachedStory.split("-");
+                if (idAndDate.length == 2) {
+                    try {
+                        cachedPostIds.add(Integer.parseInt(idAndDate[0]));
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+
+        for (String key : sharedPreferences.getAll().keySet()) {
+            if (key.startsWith(KEY_SHARED_PREFERENCES_CACHED_STORY)) {
+                addCachedPostId(cachedPostIds, key, KEY_SHARED_PREFERENCES_CACHED_STORY);
+                editor.remove(key);
+            } else if (key.startsWith(KEY_SHARED_PREFERENCES_CACHED_ARTICLE_URL)) {
+                addCachedPostId(cachedPostIds, key, KEY_SHARED_PREFERENCES_CACHED_ARTICLE_URL);
+                editor.remove(key);
+            }
+        }
+
+        editor.remove(KEY_SHARED_PREFERENCES_CACHED_STORIES_STRINGS).apply();
+
+        File articleCacheDir = getArticleCacheDir(ctx);
+        File[] cachedArticleFiles = articleCacheDir.listFiles();
+        if (cachedArticleFiles != null) {
+            for (File cachedArticleFile : cachedArticleFiles) {
+                addCachedPostId(cachedPostIds, cachedArticleFile.getName(), "", ".html");
+                deleteFileOrDirectory(cachedArticleFile);
+            }
+        }
+
+        return cachedPostIds.size();
+    }
+
+    private static void addCachedPostId(Set<Integer> cachedPostIds, String value, String prefix) {
+        addCachedPostId(cachedPostIds, value, prefix, "");
+    }
+
+    private static void addCachedPostId(Set<Integer> cachedPostIds, String value, String prefix, String suffix) {
+        if (!value.startsWith(prefix) || !value.endsWith(suffix)) {
+            return;
+        }
+
+        int end = value.length() - suffix.length();
+        try {
+            cachedPostIds.add(Integer.parseInt(value.substring(prefix.length(), end)));
+        } catch (NumberFormatException ignored) {}
+    }
+
     public static void cacheArticleSnapshot(Context ctx, int id, String url, String html) {
         if (ctx == null || id <= 0 || TextUtils.isEmpty(url) || TextUtils.isEmpty(html)) {
             return;
@@ -294,6 +354,25 @@ public class Utils {
 
     private static File getArticleCacheFile(Context ctx, int id) {
         return new File(getArticleCacheDir(ctx), id + ".html");
+    }
+
+    private static void deleteFileOrDirectory(File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteFileOrDirectory(child);
+                }
+            }
+        }
+
+        if (!file.delete()) {
+            file.deleteOnExit();
+        }
     }
 
     public static boolean hasCachedStories(Context ctx) {
