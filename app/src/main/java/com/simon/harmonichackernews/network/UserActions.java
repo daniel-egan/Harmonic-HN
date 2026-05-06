@@ -2,6 +2,9 @@ package com.simon.harmonichackernews.network;
 
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.os.Build;
 import android.os.Handler;
 import android.text.TextUtils;
 import android.widget.TextView;
@@ -181,6 +184,7 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
                 .build();
 
         Handler main = new Handler(ctx.getMainLooper());
+        NetworkComponent.resetOkHttpClientCookieInstance();
         OkHttpClient client = NetworkComponent.getOkHttpClientInstanceWithCookies();
         client.newCall(request).enqueue(new Callback() {
             @Override
@@ -200,7 +204,11 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
                     Matcher matcher = Pattern.compile(
                             "<input[^>]*name=\\\"fnid\\\"[^>]*value=\\\"([^\\\"]+)\\\""
                     ).matcher(preview);
-                    if (!matcher.find()) {
+                    if (preview.contains("Bad login.")) {
+                        main.post(() -> cb.onFailure("Bad login", "Your credentials are invalid."));
+                    } else if (preview.contains("Validation required. If this doesn't work, you can email")) {
+                        main.post(() -> cb.onFailure("Rate limit reached", "HN is temporarily requiring users to complete a CAPTCHA to proceed. Harmonic does not yet support this, apologies for the inconvenience. You can try again later or go via the official website."));
+                    } else if (!matcher.find()) {
                         main.post(() -> cb.onFailure("Bad login", "Submit form not found"));
                     } else {
                         main.post(() -> cb.onSuccess(response));
@@ -319,13 +327,34 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
 
 
     public static void showFailureDetailDialog(Context ctx, String summary, String response) {
+        showFailureDetailDialog(ctx, summary, response, null);
+    }
+
+    public static void showFailureDetailDialog(Context ctx, String summary, String response, String clipboardText) {
         // We need to try-catch this because it is called asynchronously and if the app has been
         // closed we cannot show a dialog. Instead of checking for this, we can just try-catch! :)
         try {
-            AlertDialog dialog = new MaterialAlertDialogBuilder(ctx)
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx)
                     .setTitle(summary)
                     .setMessage(response)
-                    .setNegativeButton("Done", null).create();
+                    .setNegativeButton("Done", null);
+
+            if (clipboardText != null) {
+                builder.setNeutralButton("Copy", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        ClipboardManager clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                        ClipData clip = ClipData.newPlainText("Hacker News comment", clipboardText);
+                        clipboard.setPrimaryClip(clip);
+
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                            Toast.makeText(ctx, "Comment copied to clipboard", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+            }
+
+            AlertDialog dialog = builder.create();
 
             dialog.show();
 

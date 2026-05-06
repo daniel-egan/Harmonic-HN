@@ -342,7 +342,7 @@ public class ComposeActivity extends AppCompatActivity {
                 public void onFailure(String summary, String response) {
                     submitButton.setIcon(AppCompatResources.getDrawable(getApplicationContext(), R.drawable.ic_action_send));
                     submitButton.setEnabled(true);
-                    UserActions.showFailureDetailDialog(view.getContext(), summary, response + "\n\n" + "Here is your comment should you wish to copy it and try again:\n\n" + commentText);
+                    UserActions.showFailureDetailDialog(view.getContext(), summary, response + "\n\n" + "Here is your comment should you wish to copy it and try again:\n\n" + commentText, commentText);
                     Toast.makeText(view.getContext(), "Comment post unsuccessful, see dialog for details", Toast.LENGTH_SHORT).show();
                 }
             });
