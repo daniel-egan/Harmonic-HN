@@ -1,8 +1,5 @@
 package com.simon.harmonichackernews;
 
-import android.animation.AnimatorListenerAdapter;
-import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -17,8 +14,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AlphaAnimation;
-import android.view.animation.Animation;
 import android.view.animation.PathInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -2284,43 +2279,13 @@ public class StoriesFragment extends Fragment {
 
     private void hideUpdateButton() {
         if (updateFab.getVisibility() == View.VISIBLE) {
-
-            float endYPosition = getResources().getDisplayMetrics().heightPixels - updateFab.getY() + updateFab.getHeight() + ViewUtils.getNavigationBarHeight(getResources());
-            PathInterpolator pathInterpolator = new PathInterpolator(0.3f, 0f, 0.8f, 0.15f);
-
-            ObjectAnimator yAnimator = ObjectAnimator.ofFloat(updateFab, "translationY", endYPosition);
-            yAnimator.setDuration(200);
-
-            yAnimator.setInterpolator(pathInterpolator);
-
-            ObjectAnimator alphaAnimator = ObjectAnimator.ofFloat(updateFab, "alpha", 1.0f, 0.0f);
-            alphaAnimator.setDuration(300);
-            alphaAnimator.setInterpolator(pathInterpolator);
-
-            AnimatorSet animatorSet = new AnimatorSet();
-            animatorSet.playTogether(yAnimator, alphaAnimator);
-
-            animatorSet.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(android.animation.Animator animation) {
-                    updateFab.setVisibility(View.GONE);
-                    updateFab.setTranslationY(0);
-                    updateFab.setAlpha(1f);
-                }
-            });
-
-            animatorSet.start();
+            updateFab.hide();
         }
     }
 
     private void showUpdateButton() {
         if (updateFab.getVisibility() != View.VISIBLE) {
-            updateFab.setVisibility(View.VISIBLE);
-
-            AlphaAnimation anim = new AlphaAnimation(0.0f, 1.0f);
-            anim.setDuration(300);
-            anim.setRepeatMode(Animation.REVERSE);
-            updateFab.startAnimation(anim);
+            updateFab.show();
         }
     }
 

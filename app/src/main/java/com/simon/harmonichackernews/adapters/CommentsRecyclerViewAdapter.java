@@ -32,6 +32,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.color.MaterialColors;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.loadingindicator.LoadingIndicator;
 import com.google.android.material.snackbar.Snackbar;
 import com.simon.harmonichackernews.R;
@@ -486,7 +487,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
 
             headerViewHolder.spacer.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, spacerHeight));
 
-            headerViewHolder.refreshButton.setVisibility(showUpdate ? View.VISIBLE : GONE);
+            headerViewHolder.setRefreshButtonVisible(showUpdate);
 
             int actionContainerPadding = Math.round(headerViewHolder.actionsContainer.getResources().getDimension(R.dimen.comments_header_action_padding));
             headerViewHolder.actionsContainer.setPadding(actionContainerPadding, 0, actionContainerPadding, 0);
@@ -792,7 +793,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         public final LinearLayout loadingFailed;
         public final TextView loadingFailedText;
         public final TextView serverErrorText;
-        public final Button refreshButton;
+        public final ExtendedFloatingActionButton refreshButton;
         public final ImageButton userButton;
         public final ImageButton commentButton;
         public final ImageButton voteButton;
@@ -989,6 +990,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
 
             refreshButton.setOnClickListener((v) -> {
                 showUpdate = false;
+                refreshButton.hide();
                 retryListener.onRetry();
             });
 
@@ -1108,6 +1110,16 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             } else {
                 sheetButtonsContainer.setVisibility(GONE);
                 view.findViewById(R.id.comments_sheet_handle).setVisibility(GONE);
+            }
+        }
+
+        private void setRefreshButtonVisible(boolean visible) {
+            if (visible) {
+                if (refreshButton.getVisibility() != VISIBLE) {
+                    refreshButton.show();
+                }
+            } else if (refreshButton.getVisibility() == VISIBLE) {
+                refreshButton.hide();
             }
         }
 
