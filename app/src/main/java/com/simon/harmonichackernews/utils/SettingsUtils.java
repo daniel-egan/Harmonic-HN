@@ -20,6 +20,11 @@ public class SettingsUtils {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
         Set<String> emptyBackup = new HashSet<>();
         Set<String> stringSet = sharedPref.getStringSet(key, emptyBackup);
+        if (stringSet == null) {
+            stringSet = emptyBackup;
+        } else {
+            stringSet = new HashSet<>(stringSet);
+        }
 
         Set<Integer> intSet = new HashSet<>(stringSet.size());
         for (String string : stringSet) {
@@ -41,14 +46,15 @@ public class SettingsUtils {
     public static Set<String> readStringSetFromSharedPreferences(Context ctx, String key) {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
         Set<String> emptyBackup = new HashSet<>();
-        return sharedPref.getStringSet(key, emptyBackup);
+        Set<String> stringSet = sharedPref.getStringSet(key, emptyBackup);
+        return stringSet == null ? null : new HashSet<>(stringSet);
     }
 
     public static void saveStringSetToSharedPreferences(Context ctx, String key, Set<String> set) {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
 
-        editor.putStringSet(key, set).apply();
+        editor.putStringSet(key, set == null ? null : new HashSet<>(set)).apply();
     }
 
     public static void saveStringToSharedPreferences(Context ctx, String key, String text) {
