@@ -23,6 +23,7 @@ import android.util.TypedValue;
 import android.webkit.URLUtil;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.ContextCompat;
@@ -1033,32 +1034,7 @@ public class Utils {
             StringBuffer sb = new StringBuffer(segment.length());
 
             while (m.find()) {
-                String u = m.group();
-
-                // Trim common trailing punctuation
-                int end = u.length();
-                while (end > 0 && trailing.indexOf(u.charAt(end - 1)) >= 0) end--;
-
-                // Balance unmatched ')'
-                if (end > 0 && u.charAt(end - 1) == ')') {
-                    int opens = 0, closes = 0;
-                    for (int i = 0; i < end; i++) {
-                        char c = u.charAt(i);
-                        if (c == '(') opens++;
-                        else if (c == ')') closes++;
-                    }
-                    if (closes > opens) end--;
-                }
-
-                String core = u.substring(0, end);
-                String rest = u.substring(end);
-
-                // Normalize HTML-escaped slashes in the URL for href and text
-                String normalized = core
-                        .replace("&#x2F;", "/")
-                        .replace("&#47;", "/");
-
-                String rep = "<a href=\"" + normalized + "\">" + normalized + "</a>" + rest;
+                String rep = getString(m, trailing);
                 m.appendReplacement(sb, Matcher.quoteReplacement(rep));
             }
             m.appendTail(sb);
@@ -1074,30 +1050,44 @@ public class Utils {
         Matcher m = url.matcher(segment);
         StringBuffer sb = new StringBuffer(segment.length());
         while (m.find()) {
-            String u = m.group();
-            int end = u.length();
-            while (end > 0 && trailing.indexOf(u.charAt(end - 1)) >= 0) end--;
-            if (end > 0 && u.charAt(end - 1) == ')') {
-                int opens = 0, closes = 0;
-                for (int i = 0; i < end; i++) {
-                    char c = u.charAt(i);
-                    if (c == '(') opens++;
-                    else if (c == ')') closes++;
-                }
-                if (closes > opens) end--;
-            }
-            String core = u.substring(0, end);
-            String rest = u.substring(end);
-            String normalized = core
-                    .replace("&#x2F;", "/")
-                    .replace("&#47;", "/");
-            String rep = "<a href=\"" + normalized + "\">" + normalized + "</a>" + rest;
+            String rep = getString(m, trailing);
             m.appendReplacement(sb, Matcher.quoteReplacement(rep));
         }
         m.appendTail(sb);
         out.append(sb);
 
         return out.toString();
+    }
+
+    @NonNull
+    private static String getString(Matcher m, String trailing) {
+        String u = m.group();
+
+        // Trim common trailing punctuation
+        int end = u.length();
+        while (end > 0 && trailing.indexOf(u.charAt(end - 1)) >= 0) end--;
+
+        // Balance unmatched ')'
+        if (end > 0 && u.charAt(end - 1) == ')') {
+            int opens = 0, closes = 0;
+            for (int i = 0; i < end; i++) {
+                char c = u.charAt(i);
+                if (c == '(') opens++;
+                else if (c == ')') closes++;
+            }
+            if (closes > opens) end--;
+        }
+
+        String core = u.substring(0, end);
+        String rest = u.substring(end);
+
+        // Normalize HTML-escaped slashes in the URL for href and text
+        String normalized = core
+                .replace("&#x2F;", "/")
+                .replace("&#47;", "/");
+
+        String rep = "<a href=\"" + normalized + "\">" + normalized + "</a>" + rest;
+        return rep;
     }
 
 }
