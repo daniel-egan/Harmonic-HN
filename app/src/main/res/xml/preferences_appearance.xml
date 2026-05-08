@@ -46,6 +46,16 @@
 
         <ListPreference
             app:singleLineTitle="false"
+            app:icon="@drawable/ic_action_text"
+            app:title="Comments text size"
+            app:key="pref_comment_text_size"
+            app:useSimpleSummaryProvider="true"
+            app:entries="@array/font_size_entries"
+            app:defaultValue="15"
+            app:entryValues="@array/font_size_values" />
+
+        <ListPreference
+            app:singleLineTitle="false"
             app:icon="@drawable/ic_action_font"
             app:title="Title and comment font"
             app:key="pref_font"
@@ -53,16 +63,6 @@
             app:entries="@array/font_entries"
             app:defaultValue="productsans"
             app:entryValues="@array/font_values" />
-
-        <ListPreference
-            app:singleLineTitle="false"
-            app:icon="@drawable/ic_action_whatshot"
-            app:title="Highlight hot stories"
-            app:key="pref_hotness"
-            app:useSimpleSummaryProvider="true"
-            app:entries="@array/hotness_entries"
-            app:defaultValue="-1"
-            app:entryValues="@array/hotness_values" />
 
         <SwitchPreferenceCompat
             app:isPreferenceVisible="@bool/before_android_15"

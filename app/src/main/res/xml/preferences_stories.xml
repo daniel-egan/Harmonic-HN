@@ -80,6 +80,16 @@
             app:icon="@drawable/ic_action_pdf"
             app:title="Show PDF badge" />
 
+        <ListPreference
+            app:singleLineTitle="false"
+            app:icon="@drawable/ic_action_whatshot"
+            app:title="Highlight hot stories"
+            app:key="pref_hotness"
+            app:useSimpleSummaryProvider="true"
+            app:entries="@array/hotness_entries"
+            app:defaultValue="-1"
+            app:entryValues="@array/hotness_values" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

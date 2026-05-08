@@ -4,14 +4,14 @@
     <Preference
         app:key="pref_header_appearance"
         app:title="Appearance"
-        app:summary="Theme, font, hotness highlighting"
+        app:summary="Theme, font"
         app:icon="@drawable/ic_action_style"
         app:fragment="com.simon.harmonichackernews.settings.AppearancePreferenceFragment" />
 
     <Preference
         app:key="pref_header_stories"
         app:title="Stories"
-        app:summary="Compact view, thumbnails, pagination, foldable"
+        app:summary="Compact view, thumbnails, pagination"
         app:icon="@drawable/ic_action_bookmark_border"
         app:fragment="com.simon.harmonichackernews.settings.StoriesPreferenceFragment" />
 

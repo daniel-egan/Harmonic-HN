@@ -5,16 +5,6 @@
         app:title="Display"
         android:layout="@layout/preference_category">
 
-        <ListPreference
-            app:singleLineTitle="false"
-            app:icon="@drawable/ic_action_text"
-            app:title="Comments text size"
-            app:key="pref_comment_text_size"
-            app:useSimpleSummaryProvider="true"
-            app:entries="@array/font_size_entries"
-            app:defaultValue="15"
-            app:entryValues="@array/font_size_values" />
-
         <SwitchPreferenceCompat
             app:singleLineTitle="false"
             app:key="pref_monochrome_comment_depth"
@@ -128,7 +118,7 @@
             app:key="pref_comments_animation_navigation"
             app:defaultValue="true"
             app:icon="@drawable/ic_comments_animation_navigation"
-            app:title="Animate comments navigation" />
+            app:title="Animate comment navigation" />
 
     </PreferenceCategory>
 
