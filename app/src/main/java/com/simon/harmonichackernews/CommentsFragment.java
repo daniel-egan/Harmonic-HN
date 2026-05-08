@@ -472,8 +472,23 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 updateBottomSheetMargin(systemInsets.bottom);
 
                 Insets cutoutInsets = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout());
-                int extraPadding = getResources().getDimensionPixelSize(R.dimen.extra_pane_padding);
-                bottomSheet.setPadding(Math.max(cutoutInsets.left, systemInsets.left), 0, Math.max(Math.max(cutoutInsets.right, extraPadding), systemInsets.right), 0);
+                int contentPaddingLeft = 0;
+                int contentPaddingRight = 0;
+                if (Utils.isTablet(getResources())) {
+                    if (requireActivity() instanceof MainActivity) {
+                        contentPaddingRight = getResources().getDimensionPixelSize(R.dimen.extra_pane_padding);
+                    } else {
+                        int singleViewSideMargin = getResources().getDimensionPixelSize(R.dimen.single_view_side_margin);
+                        contentPaddingLeft = singleViewSideMargin;
+                        contentPaddingRight = singleViewSideMargin;
+                    }
+                }
+                int leftPadding = Math.max(Math.max(cutoutInsets.left, systemInsets.left), contentPaddingLeft);
+                int rightPadding = Math.max(Math.max(cutoutInsets.right, systemInsets.right), contentPaddingRight);
+                bottomSheet.setPadding(leftPadding, 0, rightPadding, 0);
+
+                View emptyView = view.findViewById(R.id.comments_empty);
+                emptyView.setPadding(leftPadding, emptyView.getPaddingTop(), rightPadding, emptyView.getPaddingBottom());
 
                 webViewContainer.setPadding(0, systemInsets.top, 0, 0);
 
