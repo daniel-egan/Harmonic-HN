@@ -28,7 +28,7 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
 
     @Override
     protected String getToolbarTitle() {
-        return "Data & Storage";
+        return "Data";
     }
 
     private ActivityResultLauncher<Intent> exportLauncher;
