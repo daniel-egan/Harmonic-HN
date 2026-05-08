@@ -99,6 +99,17 @@
                     android:layout_height="17dp"    />
 
                 <TextView
+                    android:id="@+id/story_meta_points"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?attr/textColorDefault"
+                    android:text="53 points • "
+                    android:visibility="gone"
+                    android:fontFamily="@font/product_sans"
+                    android:textSize="13sp" />
+
+                <TextView
                     android:id="@+id/story_meta"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

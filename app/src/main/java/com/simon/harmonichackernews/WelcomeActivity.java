@@ -63,6 +63,11 @@ public class WelcomeActivity extends AppCompatActivity {
 
         ImageView favicon = binding.storyListItem.storyMetaFavicon;
         favicon.setImageResource(R.drawable.quanta);
+        TextView storyMetaPoints = binding.storyListItem.storyMetaPoints;
+        TextView storyMeta = binding.storyListItem.storyMeta;
+        storyMeta.setText("quantamagazine.org • 2 hrs");
+        storyMetaPoints.setVisibility(View.VISIBLE);
+        storyMetaPoints.setAlpha(1f);
 
         binding.welcomeSwitchThumbnails.setOnCheckedChangeListener((@NonNull CompoundButton compoundButton, boolean b) -> {
             beginPreviewTransition(binding);
@@ -111,22 +116,22 @@ public class WelcomeActivity extends AppCompatActivity {
 
     @SuppressLint("SetTextI18n")
     private void animateStoryMeta(ActivityWelcomeBinding binding, boolean showPoints) {
-        TextView storyMeta = binding.storyListItem.storyMeta;
-        storyMeta.animate().cancel();
-        storyMeta.animate()
-                .alpha(0f)
-                .setDuration(PREVIEW_TEXT_FADE_DURATION_MS)
-                .setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f))
-                .withEndAction(() -> {
-                    beginPreviewTransition(binding);
-                    storyMeta.setText((showPoints ? "53 points • " : "") + "quantamagazine.org • 2 hrs");
-                    storyMeta.animate()
-                            .alpha(1f)
-                            .setDuration(PREVIEW_TEXT_FADE_DURATION_MS)
-                            .setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f))
-                            .start();
-                })
-                .start();
+        TextView storyMetaPoints = binding.storyListItem.storyMetaPoints;
+        storyMetaPoints.animate().cancel();
+        if (showPoints) {
+            storyMetaPoints.setAlpha(0f);
+            beginPreviewTransition(binding);
+            storyMetaPoints.setVisibility(View.VISIBLE);
+            storyMetaPoints.animate()
+                    .alpha(1f)
+                    .setDuration(PREVIEW_TEXT_FADE_DURATION_MS)
+                    .setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f))
+                    .start();
+            return;
+        }
+
+        beginPreviewTransition(binding);
+        storyMetaPoints.setVisibility(View.GONE);
     }
 
     @SuppressLint("ApplySharedPref")
