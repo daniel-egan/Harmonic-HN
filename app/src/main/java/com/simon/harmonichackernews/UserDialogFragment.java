@@ -4,6 +4,7 @@ import static android.view.View.GONE;
 import static com.simon.harmonichackernews.SubmissionsActivity.KEY_USER;
 
 import android.app.Dialog;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.Intent;
 import android.net.Uri;
@@ -454,6 +455,33 @@ public class UserDialogFragment extends AppCompatDialogFragment {
         showUserDialog(fm, name, null);
     }
 
+    public static void showTagDialog(Context context, String userName, String currentTag, @Nullable UserDialogCallback callback) {
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+        LayoutInflater inflater = LayoutInflater.from(context);
+        View view = inflater.inflate(R.layout.tag_dialog, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+
+        TextInputEditText editText = view.findViewById(R.id.tag_dialog_edittext);
+        Button cancel = view.findViewById(R.id.tag_dialog_cancel);
+        Button save = view.findViewById(R.id.tag_dialog_save);
+
+        editText.setText(currentTag);
+
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        save.setOnClickListener(v -> {
+            String tag = editText.getText() != null ? editText.getText().toString().trim() : "";
+            Utils.setUserTag(context, userName, tag);
+
+            if (callback != null) {
+                callback.onResult(true);
+            }
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
     public void setLinkifiedText(String text, TextView textView) {
         SpannableString spannableString = new SpannableString(text);
 
@@ -478,34 +506,16 @@ public class UserDialogFragment extends AppCompatDialogFragment {
     }
 
     private void showTagDialog(String userName, String currentTag) {
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
-        LayoutInflater inflater = requireActivity().getLayoutInflater();
-        View view = inflater.inflate(R.layout.tag_dialog, null);
-        builder.setView(view);
-        AlertDialog dialog = builder.create();
-
-        TextInputEditText editText = view.findViewById(R.id.tag_dialog_edittext);
-        Button cancel = view.findViewById(R.id.tag_dialog_cancel);
-        Button save = view.findViewById(R.id.tag_dialog_save);
-
-        editText.setText(currentTag);
-
-        cancel.setOnClickListener(v -> dialog.dismiss());
-        save.setOnClickListener(v -> {
-            String tag = editText.getText() != null ? editText.getText().toString().trim() : "";
-            Utils.setUserTag(getContext(), userName, tag);
-
+        showTagDialog(requireContext(), userName, currentTag, accepted -> {
             if (tagButton != null) {
+                String tag = Utils.getUserTag(getContext(), userName);
                 tagButton.setText("Set tag" + (TextUtils.isEmpty(tag) ? "" : " (" + tag + ")"));
             }
 
             if (setTagCallback != null) {
                 setTagCallback.onResult(true);
             }
-            dialog.dismiss();
         });
-
-        dialog.show();
     }
 
 }

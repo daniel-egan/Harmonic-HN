@@ -32,15 +32,8 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        app:key="pref_category_tags"
         app:title="Tags"
-        android:layout="@layout/preference_category">
-
-        <Preference
-            app:singleLineTitle="false"
-            app:title="Manage user tags"
-            app:key="pref_manage_user_tags"
-            app:icon="@drawable/ic_action_tag" />
-
-    </PreferenceCategory>
+        android:layout="@layout/preference_category" />
 
 </PreferenceScreen>
