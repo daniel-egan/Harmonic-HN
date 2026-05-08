@@ -41,6 +41,7 @@ import com.simon.harmonichackernews.data.PollOption;
 import com.simon.harmonichackernews.data.Story;
 import com.simon.harmonichackernews.network.FaviconLoader;
 import com.simon.harmonichackernews.network.UserActions;
+import com.simon.harmonichackernews.utils.CommentDepthIndicatorUtils;
 import com.simon.harmonichackernews.utils.FontUtils;
 import com.simon.harmonichackernews.utils.SettingsUtils;
 import com.simon.harmonichackernews.utils.ThemeUtils;
@@ -83,7 +84,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public boolean commentsLoaded = false;
     public boolean collapseParent;
     public boolean showThumbnail;
-    public boolean monochromeCommentDepthIndicators;
+    public String commentDepthIndicatorMode;
     public boolean showNavigationBar;
     public boolean showInvert;
     public String faviconProvider;
@@ -115,37 +116,6 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public final static int FLAG_ACTION_CLICK_BROWSER = -4;
     public final static int FLAG_ACTION_CLICK_INVERT = -5;
 
-    private static final int[] commentDepthColorsDark = new int[]{
-            R.color.commentIndentIndicatorColor1,
-            R.color.commentIndentIndicatorColor2,
-            R.color.commentIndentIndicatorColor3,
-            R.color.commentIndentIndicatorColor4,
-            R.color.commentIndentIndicatorColor5,
-            R.color.commentIndentIndicatorColor6,
-            R.color.commentIndentIndicatorColor7
-    };
-
-    private static final int[] commentDepthColorsMaterial = new int[]{
-            R.color.material_you_primary60,
-            R.color.material_you_secondary60,
-            R.color.material_you_tertiary50,
-            R.color.material_you_neutral_variant50,
-            R.color.commentIndentIndicatorColor5,
-            R.color.commentIndentIndicatorColor6,
-            R.color.commentIndentIndicatorColor7
-    };
-
-    private static final int[] commentDepthColorsLight = new int[]{
-            R.color.commentIndentIndicatorColor1light,
-            R.color.commentIndentIndicatorColor2light,
-            R.color.commentIndentIndicatorColor3light,
-            R.color.commentIndentIndicatorColor4light,
-            R.color.commentIndentIndicatorColor5light,
-            R.color.commentIndentIndicatorColor6light,
-            R.color.commentIndentIndicatorColor7light
-    };
-
-
     public CommentsRecyclerViewAdapter(boolean useIntegratedWebview,
                                        LinearLayout sheet,
                                        FragmentManager fm,
@@ -155,7 +125,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                                        boolean shouldShowThumbnail,
                                        String usernameParam,
                                        int prefTextSize,
-                                       boolean shouldUseMonochromeCommentDepthIndicators,
+                                       String prefCommentDepthIndicatorMode,
                                        boolean shouldShowNavigationBar,
                                        String prefFont,
                                        boolean shouldShowInvert,
@@ -172,7 +142,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         story = masterItem;
         collapseParent = shouldCollapseParent;
         showThumbnail = shouldShowThumbnail;
-        monochromeCommentDepthIndicators = shouldUseMonochromeCommentDepthIndicators;
+        commentDepthIndicatorMode = CommentDepthIndicatorUtils.sanitizeMode(prefCommentDepthIndicatorMode);
         showNavigationBar = shouldShowNavigationBar;
         username = usernameParam;
         preferredTextSize = prefTextSize;
@@ -607,15 +577,8 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                 itemViewHolder.commentIndentIndicator.setVisibility(View.VISIBLE);
                 int index = (comment.depth + (showTopLevelDepthIndicator ? 0 : -1)) % 7;
 
-                if (monochromeCommentDepthIndicators) {
-                    itemViewHolder.commentIndentIndicator.setBackgroundResource(R.color.commentIndentIndicatorColorMonochrome);
-                } else {
-                    if (theme.startsWith("material")) {
-                        itemViewHolder.commentIndentIndicator.setBackgroundResource(commentDepthColorsMaterial[index]);
-                    } else {
-                        itemViewHolder.commentIndentIndicator.setBackgroundResource(ThemeUtils.isDarkMode(ctx, theme) ? commentDepthColorsDark[index] : commentDepthColorsLight[index]);
-                    }
-                }
+                itemViewHolder.commentIndentIndicator.setBackgroundResource(
+                        CommentDepthIndicatorUtils.getColorResource(ctx, commentDepthIndicatorMode, theme, index));
             }
 
             if (!comment.text.isEmpty()) {

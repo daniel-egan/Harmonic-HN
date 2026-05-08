@@ -674,7 +674,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 SettingsUtils.shouldShowThumbnails(getContext()),
                 username,
                 SettingsUtils.getPreferredCommentTextSize(getContext()),
-                SettingsUtils.shouldUseMonochromeCommentDepthIndicators(getContext()),
+                SettingsUtils.getPreferredCommentDepthIndicatorMode(getContext()),
                 SettingsUtils.shouldShowNavigationButtons(getContext()),
                 SettingsUtils.getPreferredFont(getContext()),
                 isFeatureSupported(WebViewFeature.FORCE_DARK) || WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING),
@@ -1310,8 +1310,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 updateComments = true;
             }
 
-            if (adapter.monochromeCommentDepthIndicators != SettingsUtils.shouldUseMonochromeCommentDepthIndicators(ctx)) {
-                adapter.monochromeCommentDepthIndicators = SettingsUtils.shouldUseMonochromeCommentDepthIndicators(ctx);
+            if (!adapter.commentDepthIndicatorMode.equals(SettingsUtils.getPreferredCommentDepthIndicatorMode(ctx))) {
+                adapter.commentDepthIndicatorMode = SettingsUtils.getPreferredCommentDepthIndicatorMode(ctx);
                 updateComments = true;
             }
 

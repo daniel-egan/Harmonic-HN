@@ -9,6 +9,8 @@ public class Changelog {
                 "- Improved performance of opening and interacting with comments<br>" +
                 "- Added button to go to parent comment (thanks Tsung-Han Yu!)<br>" +
                 "- Improved accessibility<br>" +
+                "- Updated UI for managing user tags<br>" +
+                "- New UI for selecting thread depth indicator colors<br>" +
                 "- Added Stack Exchange and GitLab link previews<br>" +
                 "- Added support for latex in ArXiV link preview<br>" +
                 "- Improved navigation animation between settings screens<br>" +

@@ -5,12 +5,11 @@
         app:title="Display"
         android:layout="@layout/preference_category">
 
-        <SwitchPreferenceCompat
+        <Preference
             app:singleLineTitle="false"
-            app:key="pref_monochrome_comment_depth"
+            app:key="pref_comment_depth_indicators"
             app:icon="@drawable/ic_action_colors"
-            app:defaultValue="false"
-            app:title="Monochrome thread indicators" />
+            app:title="Thread depth indicators" />
 
         <SwitchPreferenceCompat
             app:singleLineTitle="false"

@@ -15,6 +15,8 @@ import java.util.Set;
 
 public class SettingsUtils {
 
+    public static final String PREF_COMMENT_DEPTH_INDICATORS = "pref_comment_depth_indicators";
+    public static final String PREF_MONOCHROME_COMMENT_DEPTH = "pref_monochrome_comment_depth";
 
     public static Set<Integer> readIntSetFromSharedPreferences(Context ctx, String key) {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
@@ -124,8 +126,29 @@ public class SettingsUtils {
         return getBooleanPref("pref_external_browser", false, ctx);
     }
 
+    public static String getPreferredCommentDepthIndicatorMode(Context ctx) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        if (prefs.contains(PREF_COMMENT_DEPTH_INDICATORS)) {
+            return CommentDepthIndicatorUtils.sanitizeMode(
+                    prefs.getString(PREF_COMMENT_DEPTH_INDICATORS, CommentDepthIndicatorUtils.MODE_THEME_DEFAULT));
+        }
+        if (getBooleanPref(PREF_MONOCHROME_COMMENT_DEPTH, false, ctx)) {
+            return CommentDepthIndicatorUtils.MODE_MONOCHROME;
+        }
+        return CommentDepthIndicatorUtils.MODE_THEME_DEFAULT;
+    }
+
+    public static void setPreferredCommentDepthIndicatorMode(Context ctx, String mode) {
+        String sanitizedMode = CommentDepthIndicatorUtils.sanitizeMode(mode);
+        PreferenceManager.getDefaultSharedPreferences(ctx)
+                .edit()
+                .putString(PREF_COMMENT_DEPTH_INDICATORS, sanitizedMode)
+                .putBoolean(PREF_MONOCHROME_COMMENT_DEPTH, CommentDepthIndicatorUtils.MODE_MONOCHROME.equals(sanitizedMode))
+                .apply();
+    }
+
     public static boolean shouldUseMonochromeCommentDepthIndicators(Context ctx) {
-        return getBooleanPref("pref_monochrome_comment_depth", false, ctx);
+        return CommentDepthIndicatorUtils.MODE_MONOCHROME.equals(getPreferredCommentDepthIndicatorMode(ctx));
     }
 
     public static boolean shouldUseIntegratedWebView(Context ctx) {
