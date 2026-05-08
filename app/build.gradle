@@ -39,6 +39,7 @@ android {
 
     buildFeatures {
         buildConfig = true
+        resValues = true
         viewBinding = true
     }
 }
@@ -78,4 +79,9 @@ dependencies {
     implementation(libs.markwon.core)
     implementation(libs.markwon.ext.latex)
     implementation(libs.markwon.inline.parser)
+}
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
