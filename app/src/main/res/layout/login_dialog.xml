@@ -103,6 +103,21 @@
 
         </LinearLayout>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:text="Don't have an account? Create it on the Hacker News website."
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/login_dialog_create_account"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Create an account" />
+
         <LinearLayout
             android:id="@+id/login_dialog_loading_container"
             android:layout_width="wrap_content"

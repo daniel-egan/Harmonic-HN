@@ -29,6 +29,7 @@ import okhttp3.Response;
 public class LoginDialogFragment extends AppCompatDialogFragment {
 
     public static String TAG = "tag_login_dialog";
+    private static final String HACKER_NEWS_LOGIN_URL = "https://news.ycombinator.com/login";
 
     @NonNull
     @Override
@@ -46,6 +47,7 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
         MaterialButton cancelButton = rootView.findViewById(R.id.login_dialog_cancel);
         MaterialButton saveButton = rootView.findViewById(R.id.login_dialog_save);
         Button infoButton = rootView.findViewById(R.id.login_dialog_more_info);
+        Button createAccountButton = rootView.findViewById(R.id.login_dialog_create_account);
         LinearLayout infoContainer = rootView.findViewById(R.id.login_dialog_info_container);
         LinearLayout loadingContainer = rootView.findViewById(R.id.login_dialog_loading_container);
         TextView errorText = rootView.findViewById(R.id.login_dialog_error);
@@ -133,6 +135,13 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
             public void onClick(View view) {
                 infoButton.setVisibility(View.GONE);
                 infoContainer.setVisibility(View.VISIBLE);
+            }
+        });
+
+        createAccountButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Utils.launchInExternalBrowser(requireContext(), HACKER_NEWS_LOGIN_URL);
             }
         });
 
