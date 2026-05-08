@@ -1,9 +1,7 @@
 package com.simon.harmonichackernews.settings;
 
 import android.content.Intent;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.util.TypedValue;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -23,7 +21,6 @@ public class SettingsHeaderFragment extends BaseSettingsFragment {
     public static final String ABOUT_KEY = "pref_about";
 
     private String selectedKey = DEFAULT_KEY;
-    private GradientDrawable selectedDrawable;
     private RecyclerView.OnChildAttachStateChangeListener attachListener;
 
     @Override
@@ -58,21 +55,6 @@ public class SettingsHeaderFragment extends BaseSettingsFragment {
             return;
         }
 
-        TypedValue typedValue = new TypedValue();
-        requireContext().getTheme().resolveAttribute(
-                com.google.android.material.R.attr.colorSurfaceContainerHigh,
-                typedValue, true);
-        int selectedColor = typedValue.data;
-
-        float cornerRadius = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 28,
-                getResources().getDisplayMetrics());
-
-        selectedDrawable = new GradientDrawable();
-        selectedDrawable.setShape(GradientDrawable.RECTANGLE);
-        selectedDrawable.setCornerRadius(cornerRadius);
-        selectedDrawable.setColor(selectedColor);
-
         RecyclerView listView = getListView();
         listView.post(this::updateSelectionHighlight);
 
@@ -104,7 +86,7 @@ public class SettingsHeaderFragment extends BaseSettingsFragment {
     }
 
     private void updateSelectionHighlight() {
-        if (getView() == null || selectedKey == null || selectedDrawable == null) {
+        if (getView() == null || selectedKey == null) {
             return;
         }
 
@@ -122,12 +104,8 @@ public class SettingsHeaderFragment extends BaseSettingsFragment {
         for (int i = 0; i < listView.getChildCount(); i++) {
             View child = listView.getChildAt(i);
             int position = listView.getChildAdapterPosition(child);
-            if (position == selectedIndex && selectedDrawable.getConstantState() != null) {
-                child.setBackground(
-                        selectedDrawable.getConstantState().newDrawable().mutate());
-            } else {
-                child.setBackground(null);
-            }
+            child.setBackgroundResource(R.drawable.settings_header_item_background);
+            child.setActivated(position == selectedIndex);
         }
     }
 }
