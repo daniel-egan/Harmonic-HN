@@ -166,6 +166,34 @@
         <item name="alertDialogTheme">@style/AlertDialogMaterialStyle</item>
     </style>
 
+    <style name="AppThemeHackerNews" parent="AppThemeLight">
+        <item name="storyColorNormal">@color/hackerNewsStoryColorNormal</item>
+        <item name="storyColorDisabled">@color/hackerNewsStoryColorDisabled</item>
+        <item name="textColorHighlighted">@color/hackerNewsTextColorHighlighted</item>
+        <item name="textColorDefault">@color/hackerNewsTextColorDefault</item>
+        <item name="textColorDisabled">@color/hackerNewsTextColorDisabled</item>
+        <item name="commentDividerColor">@color/hackerNewsDividerColor</item>
+        <item name="drawableColor">@color/hackerNewsDrawableColor</item>
+        <item name="opCommentColor">@color/hackerNewsOpCommentColor</item>
+        <item name="selfCommentColor">@color/hackerNewsSelfCommentColor</item>
+        <item name="commentCountIndicatorColor">@color/hackerNewsAccentDark</item>
+        <item name="secondaryTextColor">@color/hackerNewsTextColorDisabled</item>
+        <item name="overlayButtonColor">@color/hackerNewsAccentContainer</item>
+
+        <item name="colorPrimary">@color/hackerNewsAccent</item>
+        <item name="colorPrimaryDark">@color/hackerNewsAccentDark</item>
+        <item name="colorAccent">@color/hackerNewsAccent</item>
+        <item name="colorSecondary">@color/hackerNewsAccent</item>
+        <item name="colorOnSecondary">@color/hackerNewsStoryColorNormal</item>
+        <item name="colorPrimaryContainer">@color/hackerNewsAccentContainer</item>
+        <item name="colorOnPrimary">@color/hackerNewsStoryColorNormal</item>
+        <item name="colorSurfaceContainerHigh">@color/hackerNewsSurfaceContainer</item>
+
+        <item name="android:windowBackground">@color/hackerNewsBackground</item>
+        <item name="android:colorBackground">@color/hackerNewsBackground</item>
+        <item name="android:statusBarColor">@color/hackerNewsBackground</item>
+    </style>
+
     <style name="AppThemeWhite" parent="@style/AppThemeLight">
         <item name="android:windowBackground">@color/whiteBackground</item>
         <item name="android:colorBackground">@color/whiteBackground</item>
@@ -217,6 +245,11 @@
         <item name="android:windowBackground">@android:color/transparent</item>
 
         <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="ThemeSwipeBackNoActionBarHackerNews" parent="@style/AppThemeHackerNews">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
     <style name="ThemeSwipeBackNoActionBarWhite" parent="@style/AppThemeWhite">

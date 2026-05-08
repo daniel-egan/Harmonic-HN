@@ -98,6 +98,7 @@ public class WelcomeActivity extends AppCompatActivity {
         binding.welcomeButtonGray.setOnClickListener(buttonClickListener);
         binding.welcomeButtonBlack.setOnClickListener(buttonClickListener);
         binding.welcomeButtonLight.setOnClickListener(buttonClickListener);
+        binding.welcomeButtonHackerNews.setOnClickListener(buttonClickListener);
         binding.welcomeButtonWhite.setOnClickListener(buttonClickListener);
     }
 

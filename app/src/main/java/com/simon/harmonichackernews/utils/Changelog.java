@@ -16,6 +16,7 @@ public class Changelog {
                 "- Improved navigation animation between settings screens<br>" +
                 "- Added ability to share Hacker News links to Harmonic<br>" +
                 "- Added support for polls via Algolia API<br>" +
+                "- Added new 'HN' theme<br>" +
                 "- Update loading indicator style for pull to refresh to Material 3 Expressive<br>" +
                 "- Made comment scroll speed adaptive<br>" +
                 "- Many other small tweaks and fixes to make the app nicer<br>" +

@@ -42,6 +42,21 @@
     <color name="lightOpCommentColor">#356858</color>
     <color name="lightSelfCommentColor">#3f51b5</color>
 
+    <color name="hackerNewsBackground">#F6F6EF</color>
+    <color name="hackerNewsAccent">#FF6600</color>
+    <color name="hackerNewsAccentDark">#B34700</color>
+    <color name="hackerNewsAccentContainer">#FFD5B8</color>
+    <color name="hackerNewsSurfaceContainer">#EEEBD9</color>
+    <color name="hackerNewsStoryColorNormal">#222222</color>
+    <color name="hackerNewsStoryColorDisabled">#828282</color>
+    <color name="hackerNewsTextColorHighlighted">#333333</color>
+    <color name="hackerNewsTextColorDefault">#555555</color>
+    <color name="hackerNewsTextColorDisabled">#828282</color>
+    <color name="hackerNewsDividerColor">#D8D3BE</color>
+    <color name="hackerNewsDrawableColor">#CC000000</color>
+    <color name="hackerNewsOpCommentColor">#AF3B00</color>
+    <color name="hackerNewsSelfCommentColor">#356858</color>
+
     <color name="commentIndentIndicatorColor1">#FF959E</color>
     <color name="commentIndentIndicatorColor2">#3f51b5</color>
     <color name="commentIndentIndicatorColor3">#ff0266</color>

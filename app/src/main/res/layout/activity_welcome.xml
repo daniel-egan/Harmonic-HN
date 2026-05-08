@@ -184,6 +184,21 @@
                 <Button
                     android:fontFamily="@font/product_sans_bold"
                     style="?attr/materialButtonOutlinedStyle"
+                    android:id="@+id/welcome_button_hacker_news"
+                    android:textColor="?attr/storyColorNormal"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginRight="8dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="52dp"
+                    android:layout_gravity="right"
+                    android:tag="hacker_news"
+                    android:text="HN"/>
+
+                <Button
+                    android:fontFamily="@font/product_sans_bold"
+                    style="?attr/materialButtonOutlinedStyle"
                     android:id="@+id/welcome_button_white"
                     android:textColor="?attr/storyColorNormal"
                     android:layout_width="0dp"

@@ -80,6 +80,9 @@ public class ThemeUtils {
             case "light":
                 activity.setTheme(swipeBack ? R.style.ThemeSwipeBackNoActionBarLight : R.style.AppThemeLight);
                 break;
+            case "hacker_news":
+                activity.setTheme(swipeBack ? R.style.ThemeSwipeBackNoActionBarHackerNews : R.style.AppThemeHackerNews);
+                break;
             case "material_light":
                 activity.setTheme(swipeBack ? R.style.ThemeSwipeBackNoActionBarMaterialLight : R.style.AppThemeMaterialLight);
                 break;
@@ -149,6 +152,8 @@ public class ThemeUtils {
                 return R.color.grayBackground;
             case "light":
                 return R.color.lightBackground;
+            case "hacker_news":
+                return R.color.hackerNewsBackground;
             case "white":
                 return R.color.whiteBackground;
             case "material_dark":

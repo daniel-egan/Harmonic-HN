@@ -26,6 +26,7 @@
         <item>Gray</item>
         <item>Black</item>
         <item>Light</item>
+        <item>HN</item>
         <item>Material You (light)</item>
         <item>White</item>
     </string-array>
@@ -39,6 +40,7 @@
         <item>gray</item>
         <item>amoled</item>
         <item>light</item>
+        <item>hacker_news</item>
         <item>material_light</item>
         <item>white</item>
     </string-array>
