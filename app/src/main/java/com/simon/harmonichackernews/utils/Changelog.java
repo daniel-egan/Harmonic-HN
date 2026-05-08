@@ -5,6 +5,7 @@ public class Changelog {
     static public String getHTML() {
         return  "<b>Version 2.4:</b><br>" +
                 "- Redesigned search, including adding search options<br>" +
+                "- Added support for notifications for comment replies activated from the profile page<br>" +
                 "- Improved performance of opening and interacting with comments<br>" +
                 "- Added button to go to parent comment (thanks Tsung-Han Yu!)<br>" +
                 "- Improved accessibility<br>" +
@@ -12,9 +13,10 @@ public class Changelog {
                 "- Added support for latex in ArXiV link preview<br>" +
                 "- Improved navigation animation between settings screens<br>" +
                 "- Added ability to share Hacker News links to Harmonic<br>" +
-                "- Added support for polls vis Algolia API<br>" +
+                "- Added support for polls via Algolia API<br>" +
                 "- Update loading indicator style for pull to refresh to Material 3 Expressive<br>" +
                 "- Made comment scroll speed adaptive<br>" +
+                "- Many other small tweaks and fixes to make the app nicer<br>" +
                 "<br>" +
                 "<b>Version 2.3.1:</b><br>" +
                 "- Fixed crash when viewing setting sub screen (my bad!)<br>" +

@@ -120,6 +120,17 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
             return false;
         });
 
+        findPreference("pref_clear_post_cache").setOnPreferenceClickListener(preference -> {
+            int oldCount = Utils.clearPostCache(requireContext());
+
+            Snackbar.make(
+                    requireView(),
+                    "Cleared " + oldCount + " cached " + (oldCount == 1 ? "post" : "posts"),
+                    Snackbar.LENGTH_SHORT).show();
+
+            return false;
+        });
+
         findPreference("pref_open_hn_links_in_harmonic").setOnPreferenceClickListener(preference -> {
             new MaterialAlertDialogBuilder(requireContext())
                     .setMessage("Since Harmonic does not own the domain news.ycombinator.com intercepting links needs to be enabled by the user manually.")

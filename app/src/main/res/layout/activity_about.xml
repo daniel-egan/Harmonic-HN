@@ -239,6 +239,36 @@
             tools:visibility="visible" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/about_debug_internal_hn_link"
+            android:textSize="14sp"
+            android:fontFamily="@font/product_sans_bold"
+            style="@style/Widget.Material3Expressive.Button.IconButton.Outlined"
+            app:icon="@drawable/ic_action_link"
+            android:textColor="?attr/storyColorNormal"
+            app:iconTint="?attr/storyColorNormal"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:onClick="openDebugInternalHnLink"
+            android:text="Internal HN link"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/about_debug_nitter_video_test"
+            android:textSize="14sp"
+            android:fontFamily="@font/product_sans_bold"
+            style="@style/Widget.Material3Expressive.Button.IconButton.Outlined"
+            app:icon="@drawable/ic_link_preview_x"
+            android:textColor="?attr/storyColorNormal"
+            app:iconTint="?attr/storyColorNormal"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:onClick="openDebugNitterVideoTest"
+            android:text="Nitter video test"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/about_debug_welcome"
             android:textSize="14sp"
             android:fontFamily="@font/product_sans_bold"

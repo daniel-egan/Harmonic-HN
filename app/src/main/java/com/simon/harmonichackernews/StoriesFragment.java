@@ -1,8 +1,5 @@
 package com.simon.harmonichackernews;
 
-import android.animation.AnimatorListenerAdapter;
-import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -17,8 +14,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AlphaAnimation;
-import android.view.animation.Animation;
 import android.view.animation.PathInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -469,7 +464,7 @@ public class StoriesFragment extends Fragment {
             public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
                 if (i != adapter.type) {
                     adapter.type = i;
-                    attemptRefresh();
+                    attemptStoryTypeRefresh();
                 }
             }
 
@@ -1400,6 +1395,10 @@ public class StoriesFragment extends Fragment {
         attemptRefresh(false);
     }
 
+    private void attemptStoryTypeRefresh() {
+        attemptRefresh(false, true);
+    }
+
     private void invalidateAlgoliaLoad() {
         algoliaRequestGeneration++;
         algoliaLoading = false;
@@ -1407,17 +1406,31 @@ public class StoriesFragment extends Fragment {
     }
 
     private void attemptRefresh(boolean showSwipeRefreshIndicator) {
+        attemptRefresh(showSwipeRefreshIndicator, false);
+    }
+
+    private void attemptRefresh(boolean showSwipeRefreshIndicator, boolean showMainLoadingIndicator) {
         hideUpdateButton();
         if (searching) {
             search(lastSearch);
             return;
         }
 
-        swipeRefreshLayout.setRefreshing(showSwipeRefreshIndicator);
+        swipeRefreshLayout.setRefreshing(showSwipeRefreshIndicator && !showMainLoadingIndicator);
 
         // cancel all ongoing
         invalidateAlgoliaLoad();
         queue.cancelAll(requestTag);
+
+        if (showMainLoadingIndicator) {
+            loadingFailed = false;
+            loadingFailedServerError = false;
+            showingCached = false;
+            clearStories();
+            appBarLayout.setExpanded(true, false);
+            recyclerView.scrollToPosition(0);
+            updateHeader();
+        }
 
         if (currentTypeIsAlgolia()) {
             // algoliaStuff
@@ -1431,7 +1444,7 @@ public class StoriesFragment extends Fragment {
                 startTime = currentTime - 60 * 60 * 24 * 7;
             }
 
-            loadTopStoriesSince(startTime);
+            loadTopStoriesSince(startTime, showSwipeRefreshIndicator && !showMainLoadingIndicator);
 
             return;
         }
@@ -1595,14 +1608,14 @@ public class StoriesFragment extends Fragment {
         }
     }
 
-    private void loadTopStoriesSince(int start_i) {
+    private void loadTopStoriesSince(int start_i, boolean showSwipeRefreshIndicator) {
         Uri uri = Uri.parse("https://hn.algolia.com/api/v1/search")
                 .buildUpon()
                 .appendQueryParameter("tags", "story")
                 .appendQueryParameter("numericFilters", "created_at_i>" + start_i)
                 .appendQueryParameter("hitsPerPage", "200")
                 .build();
-        loadAlgolia(uri.toString());
+        loadAlgolia(uri.toString(), showSwipeRefreshIndicator);
     }
 
     private void search(String query) {
@@ -1813,6 +1826,10 @@ public class StoriesFragment extends Fragment {
     }
 
     private void loadAlgolia(String url) {
+        loadAlgolia(url, false);
+    }
+
+    private void loadAlgolia(String url, boolean showSwipeRefreshIndicator) {
         if (algoliaLoading && TextUtils.equals(activeAlgoliaUrl, url)) {
             return;
         }
@@ -1826,7 +1843,7 @@ public class StoriesFragment extends Fragment {
         queue.cancelAll(requestTag);
 
         swipeRefreshLayout.setEnabled(!searching);
-        swipeRefreshLayout.setRefreshing(!searching);
+        swipeRefreshLayout.setRefreshing(!searching && showSwipeRefreshIndicator);
         if (searching && !stories.isEmpty()) {
             clearStories();
         }
@@ -2262,43 +2279,13 @@ public class StoriesFragment extends Fragment {
 
     private void hideUpdateButton() {
         if (updateFab.getVisibility() == View.VISIBLE) {
-
-            float endYPosition = getResources().getDisplayMetrics().heightPixels - updateFab.getY() + updateFab.getHeight() + ViewUtils.getNavigationBarHeight(getResources());
-            PathInterpolator pathInterpolator = new PathInterpolator(0.3f, 0f, 0.8f, 0.15f);
-
-            ObjectAnimator yAnimator = ObjectAnimator.ofFloat(updateFab, "translationY", endYPosition);
-            yAnimator.setDuration(200);
-
-            yAnimator.setInterpolator(pathInterpolator);
-
-            ObjectAnimator alphaAnimator = ObjectAnimator.ofFloat(updateFab, "alpha", 1.0f, 0.0f);
-            alphaAnimator.setDuration(300);
-            alphaAnimator.setInterpolator(pathInterpolator);
-
-            AnimatorSet animatorSet = new AnimatorSet();
-            animatorSet.playTogether(yAnimator, alphaAnimator);
-
-            animatorSet.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(android.animation.Animator animation) {
-                    updateFab.setVisibility(View.GONE);
-                    updateFab.setTranslationY(0);
-                    updateFab.setAlpha(1f);
-                }
-            });
-
-            animatorSet.start();
+            updateFab.hide();
         }
     }
 
     private void showUpdateButton() {
         if (updateFab.getVisibility() != View.VISIBLE) {
-            updateFab.setVisibility(View.VISIBLE);
-
-            AlphaAnimation anim = new AlphaAnimation(0.0f, 1.0f);
-            anim.setDuration(300);
-            anim.setRepeatMode(Animation.REVERSE);
-            updateFab.startAnimation(anim);
+            updateFab.show();
         }
     }
 

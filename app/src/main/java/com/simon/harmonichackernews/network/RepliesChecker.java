@@ -62,6 +62,8 @@ public class RepliesChecker {
 
     private static final String KEY_USERNAME = "reply_notifications_username";
     private static final String KEY_LAST_SEEN_ITEM_ID = "reply_notifications_last_seen_item_id";
+    private static final String NOTIFICATION_GROUP_KEY = "com.simon.harmonichackernews.REPLY_NOTIFICATIONS";
+    private static final int GROUP_NOTIFICATION_ID = 98373;
 
     private static final int JOB_ID = 98372;
     private static final int MAX_SUBMISSIONS_PER_CHECK = 1000;
@@ -238,9 +240,7 @@ public class RepliesChecker {
                 }
             }
 
-            for (Reply reply : replies) {
-                showNotification(ctx, reply);
-            }
+            showNotifications(ctx, replies);
 
             int newWatermark = Math.max(currentMaxItemId, highestProcessedReplyId);
             SettingsUtils.saveStringToSharedPreferences(ctx, KEY_LAST_SEEN_ITEM_ID, String.valueOf(newWatermark));
@@ -354,11 +354,101 @@ public class RepliesChecker {
     }
 
     private static void showNotification(Context ctx, Reply reply) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        showNotification(ctx, reply, false);
+    }
+
+    private static void showNotifications(Context ctx, List<Reply> replies) {
+        if (replies == null || replies.isEmpty()) {
             return;
         }
 
+        if (replies.size() == 1) {
+            showNotification(ctx, replies.get(0), false);
+            return;
+        }
+
+        if (!canPostNotifications(ctx)) {
+            return;
+        }
+
+        try {
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(ctx);
+            for (Reply reply : replies) {
+                notificationManager.notify(reply.id, buildReplyNotification(ctx, reply, true).build());
+            }
+
+            Reply latestReply = replies.get(0);
+            for (Reply reply : replies) {
+                if (reply.id > latestReply.id) {
+                    latestReply = reply;
+                }
+            }
+
+            NotificationCompat.InboxStyle style = new NotificationCompat.InboxStyle()
+                    .setBigContentTitle(replies.size() + " new replies");
+            for (Reply reply : replies) {
+                style.addLine(reply.by + ": " + reply.text);
+            }
+
+            NotificationCompat.Builder summaryBuilder = new NotificationCompat.Builder(ctx, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_action_comment)
+                    .setLargeIcon(BitmapFactory.decodeResource(ctx.getResources(), R.mipmap.ic_launcher))
+                    .setContentTitle(replies.size() + " new replies")
+                    .setContentText("New Hacker News replies")
+                    .setStyle(style)
+                    .setContentIntent(createReplyPendingIntent(ctx, latestReply, GROUP_NOTIFICATION_ID))
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setGroup(NOTIFICATION_GROUP_KEY)
+                    .setGroupSummary(true)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+                    .setAutoCancel(true);
+
+            notificationManager.notify(GROUP_NOTIFICATION_ID, summaryBuilder.build());
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void showNotification(Context ctx, Reply reply, boolean grouped) {
+        if (!canPostNotifications(ctx)) {
+            return;
+        }
+
+        try {
+            NotificationManagerCompat.from(ctx).notify(reply.id, buildReplyNotification(ctx, reply, grouped).build());
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static NotificationCompat.Builder buildReplyNotification(Context ctx, Reply reply, boolean grouped) {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_action_comment)
+                .setLargeIcon(BitmapFactory.decodeResource(ctx.getResources(), R.mipmap.ic_launcher))
+                .setContentTitle("New reply from " + reply.by)
+                .setContentText(reply.text)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(reply.text))
+                .setContentIntent(createReplyPendingIntent(ctx, reply, reply.id))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true);
+
+        if (grouped) {
+            builder.setGroup(NOTIFICATION_GROUP_KEY)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY);
+        }
+
+        return builder;
+    }
+
+    private static boolean canPostNotifications(Context ctx) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        return true;
+    }
+
+    private static PendingIntent createReplyPendingIntent(Context ctx, Reply reply, int requestCode) {
         Uri uri = Uri.parse("https://news.ycombinator.com/item")
                 .buildUpon()
                 .appendQueryParameter("id", String.valueOf(reply.parentId > 0 ? reply.parentId : reply.id))
@@ -369,28 +459,12 @@ public class RepliesChecker {
         intent.setClass(ctx, CommentsActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-        PendingIntent pendingIntent = PendingIntent.getActivity(
+        return PendingIntent.getActivity(
                 ctx,
-                reply.id,
+                requestCode,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_action_notifications)
-                .setLargeIcon(BitmapFactory.decodeResource(ctx.getResources(), R.mipmap.ic_launcher))
-                .setContentTitle("New reply from " + reply.by)
-                .setContentText(reply.text)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(reply.text))
-                .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setAutoCancel(true);
-
-        try {
-            NotificationManagerCompat.from(ctx).notify(reply.id, builder.build());
-        } catch (SecurityException e) {
-            e.printStackTrace();
-        }
     }
 
     private static void scheduleJob(Context ctx) {

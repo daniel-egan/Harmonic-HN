@@ -8,7 +8,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.Toast;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -46,6 +47,9 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
         MaterialButton saveButton = rootView.findViewById(R.id.login_dialog_save);
         Button infoButton = rootView.findViewById(R.id.login_dialog_more_info);
         LinearLayout infoContainer = rootView.findViewById(R.id.login_dialog_info_container);
+        LinearLayout loadingContainer = rootView.findViewById(R.id.login_dialog_loading_container);
+        TextView errorText = rootView.findViewById(R.id.login_dialog_error);
+        ProgressBar progressBar = rootView.findViewById(R.id.login_dialog_progress);
 
         usernameInput.addTextChangedListener(new ViewUtils.SimpleTextWatcher() {
             @Override
@@ -82,6 +86,14 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                errorText.setVisibility(View.GONE);
+                loadingContainer.setVisibility(View.VISIBLE);
+                progressBar.setVisibility(View.VISIBLE);
+                usernameInput.setEnabled(false);
+                passwordInput.setEnabled(false);
+                cancelButton.setEnabled(false);
+                saveButton.setEnabled(false);
+
                 //actually try to log in here and see if it works out
                 AccountUtils.setAccountDetails(getContext(), usernameInput.getText().toString(), passwordInput.getText().toString());
 
@@ -103,12 +115,16 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
                         }
 
                         AccountUtils.deleteAccountDetails(getContext());
-                        Utils.toast("Login failed, bad credentials?", getContext());
-                        dismiss();
+                        loadingContainer.setVisibility(View.GONE);
+                        progressBar.setVisibility(View.GONE);
+                        usernameInput.setEnabled(true);
+                        passwordInput.setEnabled(true);
+                        cancelButton.setEnabled(true);
+                        saveButton.setEnabled(true);
+                        errorText.setText("Login failed. Check your username and password, then try again.");
+                        errorText.setVisibility(View.VISIBLE);
                     }
                 });
-
-                Toast.makeText(getContext(), "Logging in...", Toast.LENGTH_SHORT).show();
             }
         });
 

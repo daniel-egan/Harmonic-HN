@@ -170,20 +170,29 @@ public class ThemeUtils {
 
     public static String getPreferredTheme(Context ctx) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
-        if (SettingsUtils.shouldUseSpecialNighttimeTheme(ctx)) {
-            // check time
-            Calendar currentCalendar = Calendar.getInstance();
-            int[] nighttimeHours = Utils.getNighttimeHours(ctx);
+        return getPreferredTheme(
+                ctx,
+                SettingsUtils.shouldUseSpecialNighttimeTheme(ctx),
+                prefs.getString("pref_theme_nighttime", "material_daynight"));
+    }
 
-            long startTime = TimeUnit.HOURS.toMinutes(nighttimeHours[0]) + nighttimeHours[1];
-            long endTime = TimeUnit.HOURS.toMinutes(nighttimeHours[2]) + nighttimeHours[3];
-            long currentTime = TimeUnit.HOURS.toMinutes(currentCalendar.get(Calendar.HOUR_OF_DAY)) + currentCalendar.get(Calendar.MINUTE);
-
-            if (Utils.isTimeBetweenTwoTimes(startTime, endTime, currentTime)) {
-                return prefs.getString("pref_theme_nighttime", "material_daynight");
-            }
+    public static String getPreferredTheme(Context ctx, boolean useSpecialNighttimeTheme, String nighttimeTheme) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        if (useSpecialNighttimeTheme && isNighttimeThemeTime(ctx)) {
+            return nighttimeTheme;
         }
         return prefs.getString("pref_theme", "material_daynight");
+    }
+
+    private static boolean isNighttimeThemeTime(Context ctx) {
+        Calendar currentCalendar = Calendar.getInstance();
+        int[] nighttimeHours = Utils.getNighttimeHours(ctx);
+
+        long startTime = TimeUnit.HOURS.toMinutes(nighttimeHours[0]) + nighttimeHours[1];
+        long endTime = TimeUnit.HOURS.toMinutes(nighttimeHours[2]) + nighttimeHours[3];
+        long currentTime = TimeUnit.HOURS.toMinutes(currentCalendar.get(Calendar.HOUR_OF_DAY)) + currentCalendar.get(Calendar.MINUTE);
+
+        return Utils.isTimeBetweenTwoTimes(startTime, endTime, currentTime);
     }
 
 }

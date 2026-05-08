@@ -14,6 +14,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -31,6 +32,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.color.MaterialColors;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.loadingindicator.LoadingIndicator;
 import com.google.android.material.snackbar.Snackbar;
 import com.simon.harmonichackernews.R;
@@ -360,23 +362,35 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                     }
                 });
 
-                if (TextUtils.isEmpty(story.nitterInfo.replyCount)) {
-                    headerViewHolder.nitterReplyCount.setVisibility(GONE);
-                    headerViewHolder.nitterReplyImageView.setVisibility(GONE);
-                }
+                boolean hasReplyCount = !TextUtils.isEmpty(story.nitterInfo.replyCount);
+                headerViewHolder.nitterReplyCount.setVisibility(hasReplyCount ? VISIBLE : GONE);
+                headerViewHolder.nitterReplyImageView.setVisibility(hasReplyCount ? VISIBLE : GONE);
 
-                if (TextUtils.isEmpty(story.nitterInfo.reposts)) {
-                    headerViewHolder.nitterReposts.setVisibility(GONE);
-                    headerViewHolder.nitterRetweetImageView.setVisibility(GONE);
-                }
+                boolean hasReposts = !TextUtils.isEmpty(story.nitterInfo.reposts);
+                headerViewHolder.nitterReposts.setVisibility(hasReposts ? VISIBLE : GONE);
+                headerViewHolder.nitterRetweetImageView.setVisibility(hasReposts ? VISIBLE : GONE);
 
-                if (TextUtils.isEmpty(story.nitterInfo.likes)) {
-                    headerViewHolder.nitterLikes.setVisibility(GONE);
-                    headerViewHolder.nitterLikesImageView.setVisibility(GONE);
-                }
+                boolean hasLikes = !TextUtils.isEmpty(story.nitterInfo.likes);
+                headerViewHolder.nitterLikes.setVisibility(hasLikes ? VISIBLE : GONE);
+                headerViewHolder.nitterLikesImageView.setVisibility(hasLikes ? VISIBLE : GONE);
 
-                if (story.nitterInfo.imgSrc != null) {
-                    headerViewHolder.nitterImage.setVisibility(VISIBLE);
+                boolean hasNitterImage = story.nitterInfo.imgSrc != null;
+                headerViewHolder.nitterMediaContainer.setVisibility(hasNitterImage ? VISIBLE : GONE);
+                headerViewHolder.nitterImage.setVisibility(hasNitterImage ? VISIBLE : GONE);
+                headerViewHolder.nitterVideoLabel.setVisibility(story.nitterInfo.hasVideo && hasNitterImage ? VISIBLE : GONE);
+
+                if (hasNitterImage) {
+                    headerViewHolder.nitterImage.setContentDescription(story.nitterInfo.hasVideo ? "Tweet video" : "Tweet image");
+                    headerViewHolder.nitterImage.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            if (integratedWebview && bottomSheet != null) {
+                                BottomSheetBehavior.from(bottomSheet).setState(BottomSheetBehavior.STATE_COLLAPSED);
+                            } else {
+                                Utils.launchCustomTab(v.getContext(), story.url);
+                            }
+                        }
+                    });
                     try {
                         ImageRequest request = new ImageRequest.Builder(ctx)
                                 .data(story.nitterInfo.imgSrc)
@@ -473,7 +487,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
 
             headerViewHolder.spacer.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, spacerHeight));
 
-            headerViewHolder.refreshButton.setVisibility(showUpdate ? View.VISIBLE : GONE);
+            headerViewHolder.setRefreshButtonVisible(showUpdate);
 
             int actionContainerPadding = Math.round(headerViewHolder.actionsContainer.getResources().getDimension(R.dimen.comments_header_action_padding));
             headerViewHolder.actionsContainer.setPadding(actionContainerPadding, 0, actionContainerPadding, 0);
@@ -779,7 +793,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         public final LinearLayout loadingFailed;
         public final TextView loadingFailedText;
         public final TextView serverErrorText;
-        public final Button refreshButton;
+        public final ExtendedFloatingActionButton refreshButton;
         public final ImageButton userButton;
         public final ImageButton commentButton;
         public final ImageButton voteButton;
@@ -847,7 +861,9 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         public final ImageView nitterRetweetImageView;
         public final ImageView nitterReplyImageView;
 
+        public final FrameLayout nitterMediaContainer;
         public final ImageView nitterImage;
+        public final TextView nitterVideoLabel;
 
         public final ImageView favicon;
         public final RelativeLayout sheetRefreshButton;
@@ -965,13 +981,16 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             nitterLikesImageView = view.findViewById(R.id.comments_header_nitter_likes_image);
             nitterRetweetImageView = view.findViewById(R.id.comments_header_nitter_reposts_image);
             nitterReplyImageView = view.findViewById(R.id.comments_header_nitter_reply_image);
+            nitterMediaContainer = view.findViewById(R.id.comments_header_nitter_media_container);
             nitterImage = view.findViewById(R.id.comments_header_nitter_image);
+            nitterVideoLabel = view.findViewById(R.id.comments_header_nitter_video_label);
 
             retryButton.setOnClickListener((v) -> retryListener.onRetry());
             openInBrowserButton.setOnClickListener((v) -> retryListener.onOpenInBrowser());
 
             refreshButton.setOnClickListener((v) -> {
                 showUpdate = false;
+                refreshButton.hide();
                 retryListener.onRetry();
             });
 
@@ -1093,6 +1112,17 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                 view.findViewById(R.id.comments_sheet_handle).setVisibility(GONE);
             }
         }
+
+        private void setRefreshButtonVisible(boolean visible) {
+            if (visible) {
+                if (refreshButton.getVisibility() != VISIBLE) {
+                    refreshButton.show();
+                }
+            } else if (refreshButton.getVisibility() == VISIBLE) {
+                refreshButton.hide();
+            }
+        }
+
     }
 
     public void setOnHeaderClickListener(CommentsRecyclerViewAdapter.HeaderClickListener clickListener) {

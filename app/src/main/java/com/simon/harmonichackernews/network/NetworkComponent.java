@@ -71,6 +71,12 @@ public class NetworkComponent {
         return okHttpClientCookieInstance;
     }
 
+    public static void resetOkHttpClientCookieInstance() {
+        synchronized (NetworkComponent.class) {
+            okHttpClientCookieInstance = null;
+        }
+    }
+
     public static RequestQueue getRequestQueueInstance(Context context) {
         if (BuildConfig.DEBUG && !Looper.getMainLooper().isCurrentThread()) {
             throw new IllegalStateException("getRequestQueueInstance currently doesn't support multithreaded access");

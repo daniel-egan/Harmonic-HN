@@ -19,18 +19,43 @@
         android:layout_height="wrap_content"
         android:paddingBottom="4dp"
         android:fontFamily="@font/product_sans" />
-    <ImageView
+    <FrameLayout
+        android:id="@+id/comments_header_nitter_media_container"
         android:background="@drawable/rounded_corners"
-        android:visibility="gone"
-        android:clipToOutline="true"
-        android:id="@+id/comments_header_nitter_image"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:adjustViewBounds="true"
-        android:scaleType="fitCenter"
-        android:contentDescription="Tweet image"
         android:layout_marginTop="6dp"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="8dp"
+        android:clipToOutline="true"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/comments_header_nitter_image"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:contentDescription="Tweet image" />
+
+        <TextView
+            android:id="@+id/comments_header_nitter_video_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|right"
+            android:layout_margin="10dp"
+            android:background="@drawable/nitter_video_label_background"
+            android:fontFamily="@font/product_sans_bold"
+            android:paddingLeft="8dp"
+            android:paddingTop="4dp"
+            android:paddingRight="8dp"
+            android:paddingBottom="4dp"
+            android:text="VIDEO"
+            android:textColor="#fff"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
     <LinearLayout
         android:orientation="horizontal"

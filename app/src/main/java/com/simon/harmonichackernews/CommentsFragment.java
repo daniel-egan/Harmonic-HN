@@ -86,6 +86,7 @@ import com.android.volley.toolbox.StringRequest;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.transition.MaterialFadeThrough;
@@ -164,6 +165,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
     private final static int PREDICTIVE_BACK_MAX_PEEK_DP = 70;
     private final static int COMMENT_NAVIGATION_SPEED_STEP = 35;
+    private final static int SEARCH_SCROLL_TOP_MIN_VISIBLE_COMMENT = 10;
 
     private BottomSheetFragmentCallback callback;
     private List<Comment> comments;
@@ -178,6 +180,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private RecyclerView.SmoothScroller smoothScroller;
     private int smoothScrollSpeedMultiplier = 1;
     private LinearLayout scrollNavigation;
+    private ExtendedFloatingActionButton searchScrollTopFab;
     private LinearProgressIndicator progressIndicator;
     private LinearLayout bottomSheet;
     private WebView webView;
@@ -219,6 +222,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private WebChromeClient.CustomViewCallback customViewCallback;
     private boolean retryingFailedWebViewUrl = false;
     private int scrollToCommentId = -1;
+    private int searchedCommentScrollTopTargetId = -1;
+    private boolean searchedCommentScrollTopPending = false;
 
     // Clean fallback management
     private AlgoliaFallbackManager fallbackManager;
@@ -525,6 +530,31 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         });
         ViewUtils.requestApplyInsetsWhenAttached(scrollNavigation);
 
+        searchScrollTopFab = view.findViewById(R.id.comments_search_scroll_top_fab);
+        FrameLayout.LayoutParams searchScrollTopFabParams = (FrameLayout.LayoutParams) searchScrollTopFab.getLayoutParams();
+        int searchScrollTopFabBottomMargin = searchScrollTopFabParams.bottomMargin;
+        ViewCompat.setOnApplyWindowInsetsListener(searchScrollTopFab, new OnApplyWindowInsetsListener() {
+            @NonNull
+            @Override
+            public WindowInsetsCompat onApplyWindowInsets(@NonNull View v, @NonNull WindowInsetsCompat windowInsets) {
+                Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.ime());
+
+                FrameLayout.LayoutParams fabParams = (FrameLayout.LayoutParams) searchScrollTopFab.getLayoutParams();
+                fabParams.setMargins(fabParams.leftMargin, fabParams.topMargin, fabParams.rightMargin, insets.bottom + searchScrollTopFabBottomMargin);
+
+                return windowInsets;
+            }
+        });
+        ViewUtils.requestApplyInsetsWhenAttached(searchScrollTopFab);
+        searchScrollTopFab.setOnClickListener(v -> {
+            if (SettingsUtils.shouldUseCommentsAnimationNavigation(requireContext())) {
+                smoothScrollTop();
+            } else {
+                scrollTop();
+            }
+            clearSearchedCommentScrollTopTarget();
+        });
+
         showNavButtons = SettingsUtils.shouldShowNavigationButtons(getContext());
         updateNavigationVisibility();
 
@@ -800,6 +830,15 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 }
 
                 // Note: Infinite scroll removed - all comments now load at once via AlgoliaFallbackManager
+                updateSearchedCommentScrollTopVisibility(!searchedCommentScrollTopPending);
+            }
+
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    updateSearchedCommentScrollTopVisibility(true);
+                }
             }
         });
         smoothScroller = new LinearSmoothScroller(requireContext()) {
@@ -1307,6 +1346,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         if (lastLoaded != 0 && (System.currentTimeMillis() - lastLoaded) > 1000 * 60 * 60 && !Utils.timeInSecondsMoreThanTwoHoursAgo(story.time)) {
             if (adapter != null && !adapter.showUpdate) {
                 adapter.showUpdate = true;
+                clearSearchedCommentScrollTopTarget();
                 adapter.notifyItemChanged(0);
             }
         }
@@ -2011,8 +2051,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                                 if (c.id == comment.id) {
                                     int targetIndex = comments.indexOf(c);
                                     expandParentsForComment(c);
+                                    setSearchedCommentScrollTopTarget(targetIndex);
                                     recyclerView.post(() -> {
                                         startCommentSmoothScrollWithScaledSpeed(targetIndex);
+                                        updateSearchedCommentScrollTopVisibility(false);
                                     });
                                     break;
                                 }
@@ -2094,6 +2136,98 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
     private void scrollTop() {
         recyclerView.scrollToPosition(0);
+    }
+
+    private void setSearchedCommentScrollTopTarget(int targetPosition) {
+        if (comments == null || adapter == null || adapter.showUpdate || targetPosition <= 0 || targetPosition >= comments.size()) {
+            clearSearchedCommentScrollTopTarget();
+            return;
+        }
+
+        if (getVisibleCommentNumber(targetPosition) <= SEARCH_SCROLL_TOP_MIN_VISIBLE_COMMENT) {
+            clearSearchedCommentScrollTopTarget();
+            return;
+        }
+
+        searchedCommentScrollTopTargetId = comments.get(targetPosition).id;
+        searchedCommentScrollTopPending = true;
+        hideSearchScrollTopFab();
+    }
+
+    private void clearSearchedCommentScrollTopTarget() {
+        searchedCommentScrollTopTargetId = -1;
+        searchedCommentScrollTopPending = false;
+        hideSearchScrollTopFab();
+    }
+
+    private void updateSearchedCommentScrollTopVisibility(boolean clearWhenAwayFromTarget) {
+        if (searchScrollTopFab == null || layoutManager == null || searchedCommentScrollTopTargetId == -1) {
+            return;
+        }
+
+        if (adapter != null && adapter.showUpdate) {
+            clearSearchedCommentScrollTopTarget();
+            return;
+        }
+
+        int targetPosition = findCommentPositionById(searchedCommentScrollTopTargetId);
+        if (targetPosition == RecyclerView.NO_POSITION
+                || getVisibleCommentNumber(targetPosition) <= SEARCH_SCROLL_TOP_MIN_VISIBLE_COMMENT) {
+            clearSearchedCommentScrollTopTarget();
+            return;
+        }
+
+        boolean targetVisible = targetPosition >= layoutManager.findFirstVisibleItemPosition()
+                && targetPosition <= layoutManager.findLastVisibleItemPosition()
+                && layoutManager.findViewByPosition(targetPosition) != null;
+
+        if (targetVisible) {
+            searchedCommentScrollTopPending = false;
+            showSearchScrollTopFab();
+        } else if (clearWhenAwayFromTarget) {
+            clearSearchedCommentScrollTopTarget();
+        }
+    }
+
+    private int findCommentPositionById(int commentId) {
+        if (comments == null) {
+            return RecyclerView.NO_POSITION;
+        }
+
+        for (int i = 1; i < comments.size(); i++) {
+            if (comments.get(i).id == commentId) {
+                return i;
+            }
+        }
+
+        return RecyclerView.NO_POSITION;
+    }
+
+    private int getVisibleCommentNumber(int targetPosition) {
+        if (adapter == null) {
+            return targetPosition;
+        }
+
+        int visibleComments = 0;
+        for (int i = 1; i <= targetPosition && i < adapter.getItemCount(); i++) {
+            if (adapter.getItemViewType(i) == CommentsRecyclerViewAdapter.TYPE_COMMENT) {
+                visibleComments++;
+            }
+        }
+
+        return visibleComments;
+    }
+
+    private void showSearchScrollTopFab() {
+        if (searchScrollTopFab != null && searchScrollTopFab.getVisibility() != View.VISIBLE) {
+            searchScrollTopFab.show();
+        }
+    }
+
+    private void hideSearchScrollTopFab() {
+        if (searchScrollTopFab != null && searchScrollTopFab.getVisibility() == View.VISIBLE) {
+            searchScrollTopFab.hide();
+        }
     }
 
     private int findFirstVisiblePosition() {

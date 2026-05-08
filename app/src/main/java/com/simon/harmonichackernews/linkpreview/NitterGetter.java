@@ -12,6 +12,7 @@ import com.android.volley.toolbox.StringRequest;
 import com.simon.harmonichackernews.data.NitterInfo;
 import com.simon.harmonichackernews.data.WikipediaInfo;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
@@ -59,32 +60,64 @@ public class NitterGetter {
         NitterInfo nitterInfo = new NitterInfo();
 
         webView.evaluateJavascript("(function() { " +
-                "var imgElement = document.querySelector('.main-tweet .attachment.image img');" +
-                "var beforeImgElement = document.querySelector('.before-tweet .attachment.image img');" +
-                "var imgSrc = imgElement ? (window.location.origin + imgElement.getAttribute('src')) : null;" +
-                "var beforeImgSrc = beforeImgElement ? (window.location.origin + beforeImgElement.getAttribute('src')) : null;" +
+                "function absoluteUrl(value) {" +
+                "   if (!value || value === 'null') return null;" +
+                "   try { return new URL(value, window.location.origin).href; } catch (e) { return value; }" +
+                "}" +
+                "function text(parent, selector) {" +
+                "   var element = selector ? (parent ? parent.querySelector(selector) : null) : parent;" +
+                "   return element ? element.textContent.trim() : '';" +
+                "}" +
+                "function html(parent, selector) {" +
+                "   var element = parent ? parent.querySelector(selector) : null;" +
+                "   return element ? element.innerHTML : '';" +
+                "}" +
+                "function media(parent) {" +
+                "   if (!parent) return { imgSrc: null, hasVideo: false };" +
+                "   var video = parent.querySelector('.attachment.video-container video, .gallery-video video, .media-gif video, video');" +
+                "   if (video) {" +
+                "       var posterImage = parent.querySelector('.attachment.video-container img, .gallery-video img, .media-gif img');" +
+                "       return {" +
+                "           imgSrc: absoluteUrl(video.getAttribute('poster') || (posterImage ? posterImage.getAttribute('src') : null))," +
+                "           hasVideo: true" +
+                "       };" +
+                "   }" +
+                "   var videoImage = parent.querySelector('.attachment.video-container img, .gallery-video img, .media-gif img');" +
+                "   if (videoImage) {" +
+                "       return { imgSrc: absoluteUrl(videoImage.getAttribute('src')), hasVideo: true };" +
+                "   }" +
+                "   var image = parent.querySelector('.attachment.image img');" +
+                "   return { imgSrc: absoluteUrl(image ? image.getAttribute('src') : null), hasVideo: false };" +
+                "}" +
+                "var mainTweet = document.querySelector('.main-tweet');" +
                 "var beforeTweet = document.querySelector('.before-tweet');" +
+                "if (!mainTweet) return null;" +
+                "var mainMedia = media(mainTweet);" +
+                "var beforeMedia = media(beforeTweet);" +
+                "var replyElement = mainTweet.querySelector('.icon-comment');" +
+                "var repostElement = mainTweet.querySelector('.icon-retweet');" +
+                "var likeElement = mainTweet.querySelector('.icon-heart');" +
                 "return JSON.stringify({" +
-                "   text: document.querySelector('.main-tweet .tweet-content').innerHTML," +
-                "   userName: document.querySelector('.main-tweet .fullname').textContent," +
-                "   userTag: document.querySelector('.main-tweet .username').textContent," +
-                "   date: document.querySelector('.main-tweet .tweet-date').textContent," +
-                "   replyCount: document.querySelector('.main-tweet .icon-comment').parentNode.textContent.trim()," +
-                "   reposts: document.querySelector('.main-tweet .icon-retweet').parentNode.textContent.trim()," +
-                "   likes: document.querySelector('.main-tweet .icon-heart').parentNode.textContent.trim()," +
-                "   beforeName: beforeTweet ? beforeTweet.querySelector('.fullname').textContent : null," +
-                "   beforeTag: beforeTweet ? beforeTweet.querySelector('.username').textContent : null," +
-                "   beforeText: beforeTweet ? beforeTweet.querySelector('.tweet-content').innerHTML : null," +
-                "   beforeDate: beforeTweet ? beforeTweet.querySelector('.tweet-date').textContent : null," +
-                "   beforeImgSrc: beforeImgSrc," +
-                "   imgSrc: imgSrc" +
+                "   text: html(mainTweet, '.tweet-content')," +
+                "   userName: text(mainTweet, '.fullname')," +
+                "   userTag: text(mainTweet, '.username')," +
+                "   date: text(mainTweet, '.tweet-date')," +
+                "   replyCount: text(replyElement ? replyElement.parentNode : null)," +
+                "   reposts: text(repostElement ? repostElement.parentNode : null)," +
+                "   likes: text(likeElement ? likeElement.parentNode : null)," +
+                "   beforeName: text(beforeTweet, '.fullname')," +
+                "   beforeTag: text(beforeTweet, '.username')," +
+                "   beforeText: html(beforeTweet, '.tweet-content')," +
+                "   beforeDate: text(beforeTweet, '.tweet-date')," +
+                "   beforeImgSrc: beforeMedia.imgSrc," +
+                "   imgSrc: mainMedia.imgSrc," +
+                "   hasVideo: mainMedia.hasVideo" +
                 "});" +
                 "}) ();", new ValueCallback<String>() {
             @Override
             public void onReceiveValue(String resp) {
                 try {
-                    //Get rid of double escaping things or something like that...
-                    resp = resp.substring(1, resp.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
+                    resp = new JSONArray("[" + resp + "]").getString(0);
 
                     JSONObject jsonObject = new JSONObject(resp);
                     nitterInfo.text = jsonObject.getString("text").replace("\n", "<br>");
@@ -95,6 +128,7 @@ public class NitterGetter {
                     nitterInfo.reposts = jsonObject.getString("reposts");
                     nitterInfo.likes = jsonObject.getString("likes");
                     nitterInfo.imgSrc = jsonObject.optString("imgSrc");
+                    nitterInfo.hasVideo = jsonObject.optBoolean("hasVideo");
 
                     nitterInfo.beforeUserName = jsonObject.optString("beforeName");
                     nitterInfo.beforeUserTag = jsonObject.optString("beforeTag");
@@ -102,11 +136,11 @@ public class NitterGetter {
                     nitterInfo.beforeDate = jsonObject.optString("beforeDate");
                     nitterInfo.beforeImgSrc = jsonObject.optString("beforeImgSrc");
 
-                    if (nitterInfo.imgSrc != null && nitterInfo.imgSrc.equals("null")) {
+                    if (TextUtils.isEmpty(nitterInfo.imgSrc) || nitterInfo.imgSrc.equals("null")) {
                         nitterInfo.imgSrc = null;
                     }
 
-                    if (nitterInfo.beforeImgSrc.equals("null")) {
+                    if (TextUtils.isEmpty(nitterInfo.beforeImgSrc) || nitterInfo.beforeImgSrc.equals("null")) {
                         nitterInfo.beforeImgSrc = null;
                     }
 

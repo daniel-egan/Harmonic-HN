@@ -63,6 +63,8 @@ public class AboutActivity extends AppCompatActivity {
             binding.aboutDebugDivider.setVisibility(View.VISIBLE);
             binding.aboutDebugLink.setVisibility(View.VISIBLE);
             binding.aboutDebugPoll.setVisibility(View.VISIBLE);
+            binding.aboutDebugInternalHnLink.setVisibility(View.VISIBLE);
+            binding.aboutDebugNitterVideoTest.setVisibility(View.VISIBLE);
             binding.aboutDebugWelcome.setVisibility(View.VISIBLE);
             binding.aboutDebugNotifications.setVisibility(View.VISIBLE);
         }
@@ -95,6 +97,14 @@ public class AboutActivity extends AppCompatActivity {
 
     public void openDebugPoll(View v) {
         Utils.openLinkMaybeHN(this, "https://news.ycombinator.com/item?id=39572682");
+    }
+
+    public void openDebugInternalHnLink(View v) {
+        Utils.openLinkMaybeHN(this, "https://news.ycombinator.com/item?id=30676384");
+    }
+
+    public void openDebugNitterVideoTest(View v) {
+        Utils.openLinkMaybeHN(this, "https://news.ycombinator.com/item?id=48012735");
     }
 
     public void openDebugWelcome(View v) {

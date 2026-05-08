@@ -11,6 +11,7 @@ public class NitterInfo {
     public String likes;
 
     public String imgSrc;
+    public boolean hasVideo;
 
     public String beforeUserName;
     public String beforeUserTag;
