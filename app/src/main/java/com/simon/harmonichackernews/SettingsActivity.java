@@ -54,6 +54,7 @@ public class SettingsActivity extends AppCompatActivity implements
         FRAGMENT_TO_KEY.put(CommentsPreferenceFragment.class.getName(), "pref_header_comments");
         FRAGMENT_TO_KEY.put(FiltersTagsPreferenceFragment.class.getName(), "pref_header_filters_tags");
         FRAGMENT_TO_KEY.put(DataStoragePreferenceFragment.class.getName(), "pref_header_data_storage");
+        FRAGMENT_TO_KEY.put(AboutFragment.class.getName(), SettingsHeaderFragment.ABOUT_KEY);
     }
 
     private static boolean requestFullRestart = false;
@@ -99,8 +100,7 @@ public class SettingsActivity extends AppCompatActivity implements
                     .commit();
 
             if (isTwoPane) {
-                Fragment detail = SettingsFragmentFactory.create(
-                        getSupportFragmentManager(), getClassLoader(), currentDetailClassName);
+                Fragment detail = createCurrentDetailFragment();
                 if (detail == null) {
                     detail = new AppearancePreferenceFragment();
                 }
@@ -212,8 +212,7 @@ public class SettingsActivity extends AppCompatActivity implements
 
                 fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
 
-                Fragment detail = SettingsFragmentFactory.create(
-                        fm, getClassLoader(), currentDetailClassName);
+                Fragment detail = createCurrentDetailFragment();
                 if (detail == null) {
                     detail = new AppearancePreferenceFragment();
                 }
@@ -231,8 +230,7 @@ public class SettingsActivity extends AppCompatActivity implements
                 // Two-pane -> single-pane: move detail into main pane
                 Fragment detailFragment = fm.findFragmentById(R.id.settings_detail);
                 if (detailFragment != null) {
-                    Fragment detail = SettingsFragmentFactory.create(
-                            fm, getClassLoader(), currentDetailClassName);
+                    Fragment detail = createCurrentDetailFragment();
                     if (detail == null) {
                         detail = new AppearancePreferenceFragment();
                     }
@@ -281,6 +279,26 @@ public class SettingsActivity extends AppCompatActivity implements
         return true;
     }
 
+    public void showAbout() {
+        currentDetailClassName = AboutFragment.class.getName();
+        currentDetailKey = SettingsHeaderFragment.ABOUT_KEY;
+
+        if (isTwoPane) {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
+                    .replace(R.id.settings_detail, new AboutFragment())
+                    .commit();
+
+            Fragment headerFragment = getSupportFragmentManager().findFragmentById(R.id.settings);
+            if (headerFragment instanceof SettingsHeaderFragment) {
+                ((SettingsHeaderFragment) headerFragment).setSelectedKey(currentDetailKey);
+            }
+        } else {
+            startActivity(new Intent(this, AboutActivity.class));
+        }
+    }
+
     @Override
     public void onRequestRestart() {
         needsRestart = true;
@@ -326,8 +344,7 @@ public class SettingsActivity extends AppCompatActivity implements
         }
 
         if (isTwoPane) {
-            Fragment detail = SettingsFragmentFactory.create(
-                    getSupportFragmentManager(), getClassLoader(), currentDetailClassName);
+            Fragment detail = createCurrentDetailFragment();
             if (detail != null) {
                 getSupportFragmentManager()
                         .beginTransaction()
@@ -342,6 +359,14 @@ public class SettingsActivity extends AppCompatActivity implements
         }
 
         maybeRelaunchDetail(intent);
+    }
+
+    private Fragment createCurrentDetailFragment() {
+        if (AboutFragment.class.getName().equals(currentDetailClassName)) {
+            return new AboutFragment();
+        }
+        return SettingsFragmentFactory.create(
+                getSupportFragmentManager(), getClassLoader(), currentDetailClassName);
     }
 
     private void updateStateFromIntent(Intent intent) {

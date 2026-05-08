@@ -15,10 +15,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.simon.harmonichackernews.AboutActivity;
 import com.simon.harmonichackernews.BuildConfig;
 import com.simon.harmonichackernews.R;
+import com.simon.harmonichackernews.SettingsActivity;
 
 public class SettingsHeaderFragment extends BaseSettingsFragment {
 
     public static final String DEFAULT_KEY = "pref_header_appearance";
+    public static final String ABOUT_KEY = "pref_about";
 
     private String selectedKey = DEFAULT_KEY;
     private GradientDrawable selectedDrawable;
@@ -33,10 +35,14 @@ public class SettingsHeaderFragment extends BaseSettingsFragment {
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.preferences_main, rootKey);
 
-        Preference aboutPref = findPreference("pref_about");
+        Preference aboutPref = findPreference(ABOUT_KEY);
         if (aboutPref != null) {
             aboutPref.setSummary("Version " + BuildConfig.VERSION_NAME);
             aboutPref.setOnPreferenceClickListener(preference -> {
+                if (getActivity() instanceof SettingsActivity) {
+                    ((SettingsActivity) getActivity()).showAbout();
+                    return true;
+                }
                 startActivity(new Intent(getContext(), AboutActivity.class));
                 return true;
             });

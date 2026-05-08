@@ -161,6 +161,7 @@
             android:layout_height="wrap_content"/>
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/about_github"
             android:textSize="14sp"
             android:layout_marginTop="16dp"
             android:fontFamily="@font/product_sans_bold"
@@ -170,10 +171,10 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openGithub"
             android:text="Harmonic on GitHub" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/about_changelog"
             android:textSize="14sp"
             android:fontFamily="@font/product_sans_bold"
             style="@style/Widget.Material3Expressive.Button.IconButton.Outlined"
@@ -182,10 +183,10 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openChangelog"
             android:text="Changelog" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/about_privacy"
             android:textSize="14sp"
             android:fontFamily="@font/product_sans_bold"
             style="@style/Widget.Material3Expressive.Button.IconButton.Outlined"
@@ -194,7 +195,6 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openPrivacy"
             android:text="Privacy policy" />
 
         <View
@@ -218,7 +218,6 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openDebugLink"
             android:text="Debug HN link"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -233,7 +232,6 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openDebugPoll"
             android:text="Debug HN poll"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -248,7 +246,6 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openDebugInternalHnLink"
             android:text="Internal HN link"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -263,7 +260,6 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openDebugNitterVideoTest"
             android:text="Nitter video test"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -278,7 +274,6 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openDebugWelcome"
             android:text="Debug Welcome activity"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -293,7 +288,6 @@
             app:iconTint="?attr/storyColorNormal"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:onClick="openDebugNotifications"
             android:text="Debug notifications"
             android:visibility="gone"
             tools:visibility="visible" />
