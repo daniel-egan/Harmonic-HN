@@ -25,10 +25,16 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
         setPreferencesFromResource(R.xml.preferences_appearance, rootKey);
 
         updateTimedRangeSummary();
+        updateStoryDisplayStyleSummary(SettingsUtils.getPreferredStoryDisplayStyle(requireContext()));
 
         boolean specialNighttime = SettingsUtils.shouldUseSpecialNighttimeTheme(getContext());
         changePrefStatus(findPreference("pref_theme_timed_range"), specialNighttime);
         changePrefStatus(findPreference("pref_theme_nighttime"), specialNighttime);
+
+        findPreference(SettingsUtils.PREF_STORY_DISPLAY_STYLE).setOnPreferenceChangeListener((preference, newValue) -> {
+            updateStoryDisplayStyleSummary((String) newValue);
+            return true;
+        });
 
         findPreference("pref_special_nighttime").setOnPreferenceChangeListener((preference, newValue) -> {
             boolean useSpecialNighttimeTheme = (boolean) newValue;
@@ -104,6 +110,11 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
             Date dateTo = new Date(0, 0, 0, nighttimeHours[2], nighttimeHours[3]);
             findPreference("pref_theme_timed_range").setSummary(df.format(dateFrom) + " - " + df.format(dateTo));
         }
+    }
+
+    private void updateStoryDisplayStyleSummary(String style) {
+        findPreference("pref_story_display_style_summary").setSummary(
+                SettingsUtils.STORY_DISPLAY_STYLE_CARD.equals(style) ? "Card" : "Standard");
     }
 
     private String getNighttimeTheme() {

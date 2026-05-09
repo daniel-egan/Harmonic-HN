@@ -929,6 +929,7 @@ public class StoriesFragment extends Fragment {
                 SettingsUtils.shouldShowIndex(getContext()),
                 SettingsUtils.shouldUseCompactHeader(getContext()),
                 SettingsUtils.shouldUseLeftAlign(getContext()),
+                SettingsUtils.shouldUseCardStoryDisplayStyle(getContext()),
                 SettingsUtils.getPreferredHotness(getContext()),
                 SettingsUtils.getPreferredFaviconProvider(getContext()),
                 null,
@@ -1134,6 +1135,12 @@ public class StoriesFragment extends Fragment {
 
         if (adapter.leftAlign != SettingsUtils.shouldUseLeftAlign(getContext())) {
             adapter.leftAlign = !adapter.leftAlign;
+            setupAdapter();
+            recyclerView.setAdapter(adapter);
+        }
+
+        if (adapter.cardStyle != SettingsUtils.shouldUseCardStoryDisplayStyle(getContext())) {
+            adapter.cardStyle = !adapter.cardStyle;
             setupAdapter();
             recyclerView.setAdapter(adapter);
         }

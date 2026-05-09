@@ -95,6 +95,7 @@ public class SubmissionsActivity extends AppCompatActivity {
                 false,
                 SettingsUtils.shouldUseCompactHeader(this),
                 SettingsUtils.shouldUseLeftAlign(this),
+                SettingsUtils.shouldUseCardStoryDisplayStyle(this),
                 SettingsUtils.getPreferredHotness(this),
                 SettingsUtils.getPreferredFaviconProvider(this),
                 userName,

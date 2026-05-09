@@ -17,6 +17,9 @@ public class SettingsUtils {
 
     public static final String PREF_COMMENT_DEPTH_INDICATORS = "pref_comment_depth_indicators";
     public static final String PREF_MONOCHROME_COMMENT_DEPTH = "pref_monochrome_comment_depth";
+    public static final String PREF_STORY_DISPLAY_STYLE = "pref_story_display_style";
+    public static final String STORY_DISPLAY_STYLE_STANDARD = "standard";
+    public static final String STORY_DISPLAY_STYLE_CARD = "card";
 
     public static Set<Integer> readIntSetFromSharedPreferences(Context ctx, String key) {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
@@ -194,6 +197,19 @@ public class SettingsUtils {
 
     public static boolean shouldUseLeftAlign(Context ctx) {
         return getBooleanPref("pref_left_align", false, ctx);
+    }
+
+    public static String getPreferredStoryDisplayStyle(Context ctx) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        String style = prefs.getString(PREF_STORY_DISPLAY_STYLE, STORY_DISPLAY_STYLE_STANDARD);
+        if (STORY_DISPLAY_STYLE_CARD.equals(style)) {
+            return STORY_DISPLAY_STYLE_CARD;
+        }
+        return STORY_DISPLAY_STYLE_STANDARD;
+    }
+
+    public static boolean shouldUseCardStoryDisplayStyle(Context ctx) {
+        return STORY_DISPLAY_STYLE_CARD.equals(getPreferredStoryDisplayStyle(ctx));
     }
 
     public static boolean shouldUseTransparentStatusBar(Context ctx) {

@@ -44,6 +44,18 @@
         app:title="Visual"
         android:layout="@layout/preference_category">
 
+        <Preference
+            app:singleLineTitle="false"
+            app:key="pref_story_display_style_summary"
+            app:icon="@drawable/ic_action_news"
+            app:selectable="false"
+            app:summary="Standard"
+            app:title="Story display style" />
+
+        <com.simon.harmonichackernews.settings.StoryDisplayStylePreference
+            app:key="pref_story_display_style"
+            app:defaultValue="standard" />
+
         <ListPreference
             app:singleLineTitle="false"
             app:icon="@drawable/ic_action_text"

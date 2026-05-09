@@ -53,6 +53,9 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     private static final int TYPE_STORY = 2;
     private static final int TYPE_COMMENT = 3;
     private static final int TYPE_LOAD_MORE_BUTTON = 4;
+    private static final int TYPE_STORY_LEFT = 5;
+    private static final int TYPE_STORY_CARD = 6;
+    private static final int TYPE_STORY_CARD_LEFT = 7;
 
     public boolean showPoints;
     public boolean showCommentsCount;
@@ -61,6 +64,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     public boolean showIndex;
     public boolean compactHeader;
     public boolean leftAlign;
+    public boolean cardStyle;
     public String faviconProvider;
     public int hotness;
     public int type;
@@ -77,6 +81,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                                     boolean shouldShowIndex,
                                     boolean shouldUseCompactHeader,
                                     boolean shouldLeftAlign,
+                                    boolean shouldUseCardStyle,
                                     int preferredHotness,
                                     String faviconProv,
                                     String submissionsUserName,
@@ -89,6 +94,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
         showIndex = shouldShowIndex;
         compactHeader = shouldUseCompactHeader;
         leftAlign = shouldLeftAlign;
+        cardStyle = shouldUseCardStyle;
         hotness = preferredHotness;
         faviconProvider = faviconProv;
         type = wantedType;
@@ -101,8 +107,8 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     @NotNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NotNull ViewGroup parent, int viewType) {
-        if (viewType == TYPE_STORY) {
-            return new StoryViewHolder(LayoutInflater.from(parent.getContext()).inflate(leftAlign ? R.layout.story_list_item_left : R.layout.story_list_item, parent, false));
+        if (isStoryViewType(viewType)) {
+            return new StoryViewHolder(LayoutInflater.from(parent.getContext()).inflate(getStoryLayout(viewType), parent, false));
         } else if (viewType == TYPE_LOAD_MORE_BUTTON) {
             return new LoadMoreViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.load_more_button, parent, false));
         } else {
@@ -278,7 +284,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     @Override
     public int getItemViewType(int position) {
         if (atSubmissions) {
-            return stories.get(position).isComment ? TYPE_COMMENT : TYPE_STORY;
+            return stories.get(position).isComment ? TYPE_COMMENT : getStoryViewType();
         }
 
         // Non-submissions (StoriesFragment): no header in adapter
@@ -286,7 +292,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             return TYPE_LOAD_MORE_BUTTON;
         }
 
-        return TYPE_STORY;
+        return getStoryViewType();
     }
 
     @Override
@@ -493,6 +499,33 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             return "1 point";
         }
         return count + " points";
+    }
+
+    private int getStoryViewType() {
+        if (cardStyle) {
+            return leftAlign ? TYPE_STORY_CARD_LEFT : TYPE_STORY_CARD;
+        }
+        return leftAlign ? TYPE_STORY_LEFT : TYPE_STORY;
+    }
+
+    private static boolean isStoryViewType(int viewType) {
+        return viewType == TYPE_STORY
+                || viewType == TYPE_STORY_LEFT
+                || viewType == TYPE_STORY_CARD
+                || viewType == TYPE_STORY_CARD_LEFT;
+    }
+
+    private static int getStoryLayout(int viewType) {
+        if (viewType == TYPE_STORY_CARD) {
+            return R.layout.story_list_item_card;
+        }
+        if (viewType == TYPE_STORY_CARD_LEFT) {
+            return R.layout.story_list_item_card_left;
+        }
+        if (viewType == TYPE_STORY_LEFT) {
+            return R.layout.story_list_item_left;
+        }
+        return R.layout.story_list_item;
     }
 
 }
