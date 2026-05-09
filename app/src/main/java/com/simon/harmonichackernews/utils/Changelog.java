@@ -4,6 +4,10 @@ package com.simon.harmonichackernews.utils;
 public class Changelog {
     static public String getHTML() {
         return  "<b>Version 2.4.1:</b><br>" +
+                "- Added support for HN Favorites. For now this is separate from Bookmarks since people have built those up over time.<br>" +
+                "- Added ability to bookmark comments<br>" +
+                "- Added new story display style: Card<br>" +
+                "- Updated many parts of settings with previews<br>" +
                 "- Added support for HN CAPTCHAs<br>" +
                 "<br>" +
                 "<b>Version 2.4:</b><br>" +
