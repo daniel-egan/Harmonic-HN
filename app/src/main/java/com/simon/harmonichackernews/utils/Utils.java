@@ -96,6 +96,7 @@ public class Utils {
     public final static String KEY_SHARED_PREFERENCES_USER_TAGS = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_USER_TAGS";
     public final static String KEY_SHARED_PREFERENCES_FIRST_TIME = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_FIRST_TIME";
     public final static String KEY_SHARED_PREFERENCES_LAST_VERSION = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_LAST_VERSION";
+    public final static String KEY_SHARED_PREFERENCES_FAVORITES = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_FAVORITES";
 
     public final static String KEY_NIGHTTIME_FROM_HOUR = "com.simon.harmonichackernews.KEY_NIGHTTIME_FROM_HOUR";
     public final static String KEY_NIGHTTIME_FROM_MINUTE = "com.simon.harmonichackernews.KEY_NIGHTTIME_FROM_MINUTE";
@@ -495,6 +496,10 @@ public class Utils {
     }
 
     public static void saveBookmarks(Context ctx, ArrayList<Bookmark> bookmarks) {
+        saveBookmarkList(ctx, KEY_SHARED_PREFERENCES_BOOKMARKS, bookmarks);
+    }
+
+    private static void saveBookmarkList(Context ctx, String key, ArrayList<Bookmark> bookmarks) {
         StringBuilder sb = new StringBuilder();
         int size = bookmarks.size();
 
@@ -508,10 +513,14 @@ public class Utils {
             }
         }
 
-        SettingsUtils.saveStringToSharedPreferences(ctx, KEY_SHARED_PREFERENCES_BOOKMARKS, sb.toString());
+        SettingsUtils.saveStringToSharedPreferences(ctx, key, sb.toString());
     }
 
     public static void addBookmark(Context ctx, int id) {
+        if (isBookmarked(ctx, id)) {
+            return;
+        }
+
         ArrayList<Bookmark> bookmarks = loadBookmarks(ctx, false);
         Bookmark b = new Bookmark();
         b.id = id;
@@ -531,6 +540,82 @@ public class Utils {
         }
 
         saveBookmarks(ctx, bookmarks);
+    }
+
+    public static ArrayList<Bookmark> loadFavorites(Context ctx, boolean sorted) {
+        ArrayList<Bookmark> favorites = loadBookmarks(false, SettingsUtils.readStringFromSharedPreferences(ctx, KEY_SHARED_PREFERENCES_FAVORITES));
+        if (sorted) {
+            Collections.sort(favorites, (b1, b2) -> Integer.compare(b2.id, b1.id));
+        }
+        return favorites;
+    }
+
+    public static boolean isFavorited(Context ctx, int id) {
+        ArrayList<Bookmark> favorites = loadFavorites(ctx, false);
+        for (Bookmark favorite : favorites) {
+            if (favorite.id == id) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void saveFavorites(Context ctx, ArrayList<Bookmark> favorites) {
+        saveBookmarkList(ctx, KEY_SHARED_PREFERENCES_FAVORITES, favorites);
+    }
+
+    public static void saveFavoriteIds(Context ctx, List<Integer> ids) {
+        ArrayList<Bookmark> favorites = new ArrayList<>();
+        Set<Integer> seenIds = new HashSet<>();
+        long now = System.currentTimeMillis();
+
+        for (int id : ids) {
+            if (!seenIds.add(id)) {
+                continue;
+            }
+
+            Bookmark favorite = new Bookmark();
+            favorite.id = id;
+            favorite.created = now - favorites.size();
+            favorites.add(favorite);
+        }
+
+        saveFavorites(ctx, favorites);
+    }
+
+    public static void addFavorite(Context ctx, int id) {
+        if (isFavorited(ctx, id)) {
+            return;
+        }
+
+        ArrayList<Bookmark> favorites = loadFavorites(ctx, false);
+        Bookmark favorite = new Bookmark();
+        favorite.id = id;
+        favorite.created = System.currentTimeMillis();
+        favorites.add(favorite);
+        saveFavorites(ctx, favorites);
+    }
+
+    public static void setFavorite(Context ctx, int id, boolean favorite) {
+        if (favorite) {
+            addFavorite(ctx, id);
+        } else {
+            removeFavorite(ctx, id);
+        }
+    }
+
+    public static void removeFavorite(Context ctx, int id) {
+        ArrayList<Bookmark> favorites = loadFavorites(ctx, false);
+
+        for (Bookmark favorite: favorites) {
+            if (favorite.id == id) {
+                favorites.remove(favorite);
+                break;
+            }
+        }
+
+        saveFavorites(ctx, favorites);
     }
 
     public static String getThousandSeparatedString(int n) {

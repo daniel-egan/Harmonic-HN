@@ -23,6 +23,7 @@ public class SettingsUtils {
     public static final String STORY_DISPLAY_STYLE_CARD = "card";
     public static final String COMMENT_DISPLAY_STYLE_STANDARD = STORY_DISPLAY_STYLE_STANDARD;
     public static final String COMMENT_DISPLAY_STYLE_CARD = STORY_DISPLAY_STYLE_CARD;
+    public static final String FAVORITES_LABEL = "Favorites";
 
     public static Set<Integer> readIntSetFromSharedPreferences(Context ctx, String key) {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
@@ -352,6 +353,10 @@ public class SettingsUtils {
         }
         // fallback
         return sortingOptions.length - 1;
+    }
+
+    public static int getFavoritesIndex(Resources res) {
+        return getBookmarksIndex(res) + 1;
     }
 
     public static int getJobsIndex(Resources res) {

@@ -140,6 +140,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import okhttp3.Call;
+import okhttp3.Response;
 
 public class CommentsFragment extends Fragment implements CommentsRecyclerViewAdapter.CommentClickListener, CommentsRecyclerViewAdapter.RequestSummaryCallback, CommentsRecyclerViewAdapter.RetryListener {
 
@@ -156,6 +157,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     public final static String EXTRA_TEXT = "com.simon.harmonichackernews.EXTRA_TEXT";
     public final static String EXTRA_IS_LINK = "com.simon.harmonichackernews.EXTRA_IS_LINK";
     public final static String EXTRA_IS_COMMENT = "com.simon.harmonichackernews.EXTRA_IS_COMMENT";
+    public final static String EXTRA_PARENT_ID = "com.simon.harmonichackernews.EXTRA_PARENT_ID";
+    public final static String EXTRA_COMMENT_MASTER_ID = "com.simon.harmonichackernews.EXTRA_COMMENT_MASTER_ID";
+    public final static String EXTRA_COMMENT_MASTER_TITLE = "com.simon.harmonichackernews.EXTRA_COMMENT_MASTER_TITLE";
+    public final static String EXTRA_COMMENT_MASTER_URL = "com.simon.harmonichackernews.EXTRA_COMMENT_MASTER_URL";
     public final static String EXTRA_FORWARD = "com.simon.harmonichackernews.EXTRA_FORWARD";
     public final static String EXTRA_SHOW_WEBSITE = "com.simon.harmonichackernews.EXTRA_SHOW_WEBSITE";
     private final static String PDF_MIME_TYPE = "application/pdf";
@@ -257,6 +262,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             story.text = bundle.getString(EXTRA_TEXT);
             story.isLink = bundle.getBoolean(EXTRA_IS_LINK, true);
             story.isComment = bundle.getBoolean(EXTRA_IS_COMMENT, false);
+            story.parentId = bundle.getInt(EXTRA_PARENT_ID, 0);
+            story.commentMasterId = bundle.getInt(EXTRA_COMMENT_MASTER_ID, 0);
+            story.commentMasterTitle = bundle.getString(EXTRA_COMMENT_MASTER_TITLE);
+            story.commentMasterUrl = bundle.getString(EXTRA_COMMENT_MASTER_URL);
             story.loaded = true;
 
             if (Utils.isTablet(getResources())) {
@@ -774,6 +783,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
                     case CommentsRecyclerViewAdapter.FLAG_ACTION_CLICK_VOTE:
                         clickVote();
+                        break;
+
+                    case CommentsRecyclerViewAdapter.FLAG_ACTION_CLICK_FAVORITE:
+                        clickFavorite();
                         break;
 
                     case CommentsRecyclerViewAdapter.FLAG_ACTION_CLICK_SHARE:
@@ -2148,6 +2161,35 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         UserActions.upvote(getContext(), adapter.story.id, getParentFragmentManager());
     }
 
+    public void clickFavorite() {
+        Context ctx = getContext();
+        if (ctx == null || adapter == null) {
+            return;
+        }
+
+        boolean wasFavorited = Utils.isFavorited(ctx, adapter.story.id);
+        if (!AccountUtils.hasAccountDetails(ctx)) {
+            AccountUtils.showLoginPrompt(getParentFragmentManager());
+            return;
+        }
+
+        Utils.setFavorite(ctx, adapter.story.id, !wasFavorited);
+        adapter.notifyItemChanged(0);
+        UserActions.setFavorite(ctx, adapter.story.id, !wasFavorited, getParentFragmentManager(), new UserActions.ActionCallback() {
+            @Override
+            public void onSuccess(Response response) {
+            }
+
+            @Override
+            public void onFailure(String summary, String response) {
+                Utils.setFavorite(ctx, adapter.story.id, wasFavorited);
+                adapter.notifyItemChanged(0);
+                UserActions.showFailureDetailDialog(ctx, summary, response);
+                Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private void smoothScrollTop() {
         if (layoutManager != null) {
             startCommentSmoothScrollWithScaledSpeed(0);
@@ -2499,6 +2541,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         final Context ctx = getContext();
 
         Pair[] items;
+        boolean oldBookmarked = Utils.isBookmarked(ctx, comment.id);
+        boolean oldFavorited = Utils.isFavorited(ctx, comment.id);
 
         if (Utils.timeInSecondsMoreThanTwoWeeksAgo(comment.time)) {
             items = new Pair[]{
@@ -2506,6 +2550,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                     new Pair<>("Share comment link", R.drawable.ic_action_share),
                     new Pair<>("Copy text", R.drawable.ic_action_copy),
                     new Pair<>("Select text", R.drawable.ic_action_select),
+                    new Pair<>(oldBookmarked ? "Remove bookmark" : "Bookmark", oldBookmarked ? R.drawable.ic_action_bookmark_filled : R.drawable.ic_action_bookmark_border),
+                    new Pair<>(oldFavorited ? "Remove favorite" : "Favorite", oldFavorited ? R.drawable.ic_action_star_filled : R.drawable.ic_action_star),
                     new Pair<>("Vote up", R.drawable.ic_action_thumbs_up),
                     new Pair<>("Unvote", R.drawable.ic_action_thumbs),
                     new Pair<>("Vote down", R.drawable.ic_action_thumb_down),
@@ -2516,6 +2562,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                     new Pair<>("Share comment link", R.drawable.ic_action_share),
                     new Pair<>("Copy text", R.drawable.ic_action_copy),
                     new Pair<>("Select text", R.drawable.ic_action_select),
+                    new Pair<>(oldBookmarked ? "Remove bookmark" : "Bookmark", oldBookmarked ? R.drawable.ic_action_bookmark_filled : R.drawable.ic_action_bookmark_border),
+                    new Pair<>(oldFavorited ? "Remove favorite" : "Favorite", oldFavorited ? R.drawable.ic_action_star_filled : R.drawable.ic_action_star),
                     new Pair<>("Vote up", R.drawable.ic_action_thumbs_up),
                     new Pair<>("Unvote", R.drawable.ic_action_thumbs),
                     new Pair<>("Vote down", R.drawable.ic_action_thumb_down),
@@ -2572,19 +2620,49 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                         DialogUtils.showTextSelectionDialog(ctx, comment.text);
 
                         break;
-                    case 4: //upvote
+
+                    case 4: //bookmark
+                        if (oldBookmarked) {
+                            Utils.removeBookmark(ctx, comment.id);
+                        } else {
+                            Utils.addBookmark(ctx, comment.id);
+                        }
+                        break;
+
+                    case 5: //favorite
+                        if (!AccountUtils.hasAccountDetails(ctx)) {
+                            AccountUtils.showLoginPrompt(getParentFragmentManager());
+                            break;
+                        }
+
+                        Utils.setFavorite(ctx, comment.id, !oldFavorited);
+                        UserActions.setFavorite(ctx, comment.id, !oldFavorited, getParentFragmentManager(), new UserActions.ActionCallback() {
+                            @Override
+                            public void onSuccess(Response response) {
+                            }
+
+                            @Override
+                            public void onFailure(String summary, String response) {
+                                Utils.setFavorite(ctx, comment.id, oldFavorited);
+                                UserActions.showFailureDetailDialog(ctx, summary, response);
+                                Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                        break;
+
+                    case 6: //upvote
                         UserActions.upvote(ctx, comment.id, getParentFragmentManager());
                         break;
 
-                    case 5: //unvote
+                    case 7: //unvote
                         UserActions.unvote(ctx, comment.id, getParentFragmentManager());
                         break;
 
-                    case 6: //downvote
+                    case 8: //downvote
                         UserActions.downvote(ctx, comment.id, getParentFragmentManager());
                         break;
 
-                    case 7: //reply
+                    case 9: //reply
                         if (!AccountUtils.hasAccountDetails(ctx)) {
                             AccountUtils.showLoginPrompt(getParentFragmentManager());
                             return;

@@ -107,6 +107,7 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
                         }
 
                         Utils.toast("Login successful", getContext());
+                        notifyAccountStateChanged();
                         dismiss();
                     }
 
@@ -137,6 +138,7 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
                                         }
 
                                         Utils.toast("Login successful", getContext());
+                                        notifyAccountStateChanged();
                                         dismiss();
                                     }
 
@@ -212,5 +214,11 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
         });
 
         return dialog;
+    }
+
+    private void notifyAccountStateChanged() {
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).onAccountStateChanged();
+        }
     }
 }

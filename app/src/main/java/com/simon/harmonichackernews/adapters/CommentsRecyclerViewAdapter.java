@@ -34,7 +34,6 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.loadingindicator.LoadingIndicator;
-import com.google.android.material.snackbar.Snackbar;
 import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.data.Comment;
 import com.simon.harmonichackernews.data.PollOption;
@@ -111,6 +110,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public final static int FLAG_ACTION_CLICK_USER = 0;
     public final static int FLAG_ACTION_CLICK_COMMENT = 1;
     public final static int FLAG_ACTION_CLICK_VOTE = 2;
+    public final static int FLAG_ACTION_CLICK_FAVORITE = 3;
     public final static int FLAG_ACTION_CLICK_SHARE = 4;
     public final static int FLAG_ACTION_CLICK_MORE = 5;
     public final static int FLAG_ACTION_CLICK_REFRESH = -2;
@@ -521,24 +521,16 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                     }
 
                     notifyItemChanged(0);
-
-                    Snackbar snackbar = Snackbar.make(
-                            view,
-                            wasBookmarked ? "Removed bookmark" : "Bookmarked post",
-                            Snackbar.LENGTH_SHORT);
-
-                    ViewCompat.setElevation(snackbar.getView(), Utils.pxFromDp(view.getResources(), 24));
-
-                    if (showNavigationBar) {
-                        snackbar.getView().setTranslationY(-ctx.getResources().getDimensionPixelSize(R.dimen.comments_bottom_navigation));
-                    }
-
-                    snackbar.show();
                 }
             });
 
+            boolean isFavorited = Utils.isFavorited(ctx, story.id);
+            headerViewHolder.favoriteButton.setImageResource(isFavorited ? R.drawable.ic_action_star_filled : R.drawable.ic_action_star);
+            headerViewHolder.favoriteButton.setAlpha(1.0f);
+            headerViewHolder.favoriteButton.setContentDescription(isFavorited ? "Remove favorite" : "Favorite");
+
             headerViewHolder.emptyViewText.setText(story.isComment ? "No replies" : "No comments");
-            headerViewHolder.bookmarkButtonParent.setVisibility(story.isComment ? GONE : VISIBLE);
+            headerViewHolder.bookmarkButtonParent.setVisibility(VISIBLE);
             headerViewHolder.commentButtonParent.setVisibility(Utils.timeInSecondsMoreThanTwoWeeksAgo(story.time) ? GONE : View.VISIBLE);
             headerViewHolder.commentButton.setContentDescription(story.isComment ? "Reply to comment" : "Reply to post");
             headerViewHolder.voteButton.setContentDescription(story.isComment ? "Upvote comment" : "Upvote post");
@@ -780,6 +772,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         public final ImageButton userButton;
         public final ImageButton commentButton;
         public final ImageButton voteButton;
+        public final ImageButton favoriteButton;
         public final ImageButton bookmarkButton;
         public final ImageButton shareButton;
         public final ImageButton summarizeButton;
@@ -793,6 +786,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         public final RelativeLayout userButtonParent;
         public final RelativeLayout moreButtonParent;
         public final RelativeLayout commentButtonParent;
+        public final RelativeLayout favoriteButtonParent;
         public final RelativeLayout bookmarkButtonParent;
         public final Space spacer;
         public final TextView githubAbout;
@@ -889,6 +883,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             userButton = view.findViewById(R.id.comments_header_button_user);
             commentButton = view.findViewById(R.id.comments_header_button_comment);
             voteButton = view.findViewById(R.id.comments_header_button_vote);
+            favoriteButton = view.findViewById(R.id.comments_header_button_favorite);
             bookmarkButton = view.findViewById(R.id.comments_header_button_bookmark);
             shareButton = view.findViewById(R.id.comments_header_button_share);
             summarizeButtonParent = view.findViewById(R.id.comments_header_button_summarize_parent);
@@ -902,6 +897,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             userButtonParent = view.findViewById(R.id.comments_header_button_user_parent);
             moreButtonParent = view.findViewById(R.id.comments_header_button_more_parent);
             commentButtonParent = view.findViewById(R.id.comments_header_button_comment_parent);
+            favoriteButtonParent = view.findViewById(R.id.comments_header_button_favorite_parent);
             bookmarkButtonParent = view.findViewById(R.id.comments_header_button_bookmark_parent);
             retryButton = view.findViewById(R.id.comments_header_retry);
             openInBrowserButton = view.findViewById(R.id.comments_header_open_in_browser);
@@ -984,6 +980,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             userButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_USER, null));
             commentButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_COMMENT, null));
             voteButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_VOTE, view));
+            favoriteButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_FAVORITE, view));
             shareButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_SHARE, v));
             moreButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_MORE, v));
             sheetRefreshButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_REFRESH, view));
@@ -999,6 +996,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             TooltipCompat.setTooltipText(userButton, "User");
             TooltipCompat.setTooltipText(commentButton, "Comment");
             TooltipCompat.setTooltipText(voteButton, "Vote");
+            TooltipCompat.setTooltipText(favoriteButton, "Favorite");
             TooltipCompat.setTooltipText(bookmarkButton, "Bookmark");
             TooltipCompat.setTooltipText(summarizeButton, "Summarize");
             TooltipCompat.setTooltipText(shareButton, "Share");

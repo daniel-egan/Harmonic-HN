@@ -27,7 +27,6 @@ import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.data.Story;
 import com.simon.harmonichackernews.network.FaviconLoader;
 import com.simon.harmonichackernews.utils.FontUtils;
-import com.simon.harmonichackernews.utils.SettingsUtils;
 import com.simon.harmonichackernews.utils.ThemeUtils;
 import com.simon.harmonichackernews.utils.Utils;
 import com.simon.harmonichackernews.utils.ViewUtils;
@@ -68,6 +67,8 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     public String faviconProvider;
     public int hotness;
     public int type;
+    public boolean allowCommentRows;
+    public boolean disableClickedEffects;
 
     public boolean paginationMode = false;
     public static final int PAGINATION_PAGE_SIZE = 30;
@@ -135,13 +136,14 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             final Context ctx = storyViewHolder.itemView.getContext();
 
             storyViewHolder.story = stories.get(position);
+            boolean useClickedEffects = storyViewHolder.story.clicked && !disableClickedEffects;
 
             if (showIndex) {
                 int displayIndex = position + 1;
                 storyViewHolder.indexTextView.setText(displayIndex + ".");
                 storyViewHolder.indexTextView.setContentDescription("Story " + displayIndex);
 
-                if (storyViewHolder.story.clicked) {
+                if (useClickedEffects) {
                     storyViewHolder.indexTextView.setTextColor(Utils.getColorViaAttr(ctx, R.attr.storyColorDisabled));
                 } else {
                     storyViewHolder.indexTextView.setTextColor(Utils.getColorViaAttr(ctx, R.attr.storyColorNormal));
@@ -162,7 +164,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                 if (!TextUtils.isEmpty(storyViewHolder.story.pdfTitle)) {
                     SpannableStringBuilder sb = new SpannableStringBuilder(storyViewHolder.story.pdfTitle + " ");
 
-                    ImageSpan imageSpan = new ImageSpan(ctx, storyViewHolder.story.clicked ? R.drawable.ic_action_pdf_clicked : R.drawable.ic_action_pdf);
+                    ImageSpan imageSpan = new ImageSpan(ctx, useClickedEffects ? R.drawable.ic_action_pdf_clicked : R.drawable.ic_action_pdf);
                     sb.setSpan(imageSpan, sb.length() - 1, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
                     storyViewHolder.titleView.setText(sb);
@@ -213,7 +215,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                 FontUtils.setTypeface(storyViewHolder.metaView, false, 13, 13, 12, 12, 13, 13);
                 FontUtils.setTypeface(storyViewHolder.commentsView, true, 14, 13, 13, 14, 14, 14);
 
-                if (storyViewHolder.story.clicked && type != SettingsUtils.getBookmarksIndex(ctx.getResources())) {
+                if (useClickedEffects) {
                     storyViewHolder.titleView.setTextColor(Utils.getColorViaAttr(ctx, R.attr.storyColorDisabled));
                     storyViewHolder.commentsIcon.setAlpha(0.6f);
                     storyViewHolder.metaFavicon.setAlpha(0.6f);
@@ -256,14 +258,16 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                 storyViewHolder.commentLayoutView.setContentDescription(null);
                 storyViewHolder.linkLayoutView.setClickable(false);
                 storyViewHolder.commentLayoutView.setClickable(false);
-                storyViewHolder.commentsIcon.setAlpha(storyViewHolder.story.clicked ? 0.6f : 1.0f);
+                storyViewHolder.commentsIcon.setAlpha(useClickedEffects ? 0.6f : 1.0f);
             }
         } else if (holder instanceof CommentViewHolder) {
             final CommentViewHolder commentViewHolder = (CommentViewHolder) holder;
 
             Story story = stories.get(position);
 
-            commentViewHolder.headerText.setText("On \"" + story.commentMasterTitle + "\" " + Utils.getTimeAgo(story.time));
+            String masterTitle = TextUtils.isEmpty(story.commentMasterTitle) ? "Hacker News thread" : story.commentMasterTitle;
+            commentViewHolder.headerText.setText("On \"" + masterTitle + "\" " + Utils.getTimeAgo(story.time));
+            commentViewHolder.storyButton.setEnabled(story.commentMasterId > 0 || story.parentId > 0);
             if (story.spannedText != null) {
                 commentViewHolder.bodyText.setHtml(story.spannedText);
             } else {
@@ -287,9 +291,12 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             return stories.get(position).isComment ? TYPE_COMMENT : getStoryViewType();
         }
 
-        // Non-submissions (StoriesFragment): no header in adapter
         if (paginationMode && position == visibleStoryCount && visibleStoryCount < stories.size()) {
             return TYPE_LOAD_MORE_BUTTON;
+        }
+
+        if (allowCommentRows && stories.get(position).isComment) {
+            return TYPE_COMMENT;
         }
 
         return getStoryViewType();
