@@ -20,20 +20,6 @@
             app:icon="@drawable/ic_action_horizontal_split"
             app:title="Compact header" />
 
-        <SwitchPreferenceCompat
-            app:singleLineTitle="false"
-            app:key="pref_show_index"
-            app:defaultValue="false"
-            app:icon="@drawable/ic_action_index"
-            app:title="Show story indices" />
-
-        <SwitchPreferenceCompat
-            app:singleLineTitle="false"
-            app:key="pref_left_align"
-            app:defaultValue="false"
-            app:icon="@drawable/ic_action_hand"
-            app:title="Left align comments button" />
-
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -73,6 +59,20 @@
             app:defaultValue="true"
             app:icon="@drawable/ic_action_comment"
             app:title="Show comment count" />
+
+        <SwitchPreferenceCompat
+            app:singleLineTitle="false"
+            app:key="pref_show_index"
+            app:defaultValue="false"
+            app:icon="@drawable/ic_action_index"
+            app:title="Show story indices" />
+
+        <SwitchPreferenceCompat
+            app:singleLineTitle="false"
+            app:key="pref_left_align"
+            app:defaultValue="false"
+            app:icon="@drawable/ic_action_hand"
+            app:title="Left align comments button" />
 
         <SwitchPreferenceCompat
             app:isPreferenceVisible="false"

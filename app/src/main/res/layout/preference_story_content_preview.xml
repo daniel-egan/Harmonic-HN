@@ -1,13 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/story_content_preview_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:orientation="vertical"
     android:paddingStart="16dp"
-    android:paddingTop="8dp"
+    android:paddingTop="10dp"
     android:paddingEnd="16dp"
     android:paddingBottom="10dp">
 
-    <include layout="@layout/story_list_item" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="-6dp"
+        android:fontFamily="@font/product_sans"
+        android:text="Preview"
+        android:textAllCaps="true"
+        android:textColor="?attr/textColorDisabled"
+        android:textSize="13dp"
+        android:textStyle="bold" />
 
-</FrameLayout>
+    <FrameLayout
+        android:id="@+id/story_content_preview_item_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+</LinearLayout>

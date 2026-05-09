@@ -3,7 +3,10 @@ package com.simon.harmonichackernews.utils;
 
 public class Changelog {
     static public String getHTML() {
-        return  "<b>Version 2.4:</b><br>" +
+        return  "<b>Version 2.4.1:</b><br>" +
+                "- Added support for HN CAPTCHAs<br>" +
+                "<br>" +
+                "<b>Version 2.4:</b><br>" +
                 "- Redesigned search, including adding search options<br>" +
                 "- Added support for notifications for comment replies activated from the profile page<br>" +
                 "- Improved performance of opening and interacting with comments<br>" +

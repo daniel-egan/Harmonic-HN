@@ -70,6 +70,9 @@ public class StoriesPreferenceFragment extends BaseSettingsFragment {
         });
 
         findPreference("pref_show_index").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updateShowIndex((boolean) newValue);
+            }
             // Re-render widget list items to show/hide indices (no network fetch)
             AppWidgetManager awm = AppWidgetManager.getInstance(requireContext());
             int[] ids = awm.getAppWidgetIds(
@@ -77,6 +80,20 @@ public class StoriesPreferenceFragment extends BaseSettingsFragment {
             if (ids.length > 0) {
                 StoriesRemoteViewsFactory.setSkipFetchAll(requireContext(), true);
                 awm.notifyAppWidgetViewDataChanged(ids, R.id.widget_stories_list);
+            }
+            return true;
+        });
+
+        findPreference("pref_left_align").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updateLeftAlign((boolean) newValue);
+            }
+            return true;
+        });
+
+        findPreference("pref_hotness").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updateHotness((String) newValue);
             }
             return true;
         });
