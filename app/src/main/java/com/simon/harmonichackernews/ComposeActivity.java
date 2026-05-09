@@ -309,7 +309,11 @@ public class ComposeActivity extends AppCompatActivity {
         c.start();
 
         if (type == TYPE_POST) {
-            UserActions.submit(editTextTitle.getText().toString(), editText.getText().toString(), editTextUrl.getText().toString(), view.getContext(), new UserActions.ActionCallback() {
+            final String postTitle = editTextTitle.getText().toString();
+            final String postText = editText.getText().toString();
+            final String postUrl = editTextUrl.getText().toString();
+
+            UserActions.submit(postTitle, postText, postUrl, view.getContext(), new UserActions.ActionCallback() {
                 @Override
                 public void onSuccess(Response response) {
                     submitButton.setIcon(AppCompatResources.getDrawable(getApplicationContext(), R.drawable.ic_action_send));
@@ -320,16 +324,36 @@ public class ComposeActivity extends AppCompatActivity {
 
                 @Override
                 public void onFailure(String summary, String response) {
-                    submitButton.setIcon(AppCompatResources.getDrawable(getApplicationContext(), R.drawable.ic_action_send));
-                    submitButton.setEnabled(true);
+                    resetSubmitButton(submitButton);
                     UserActions.showFailureDetailDialog(view.getContext(), summary, response);
                     Toast.makeText(view.getContext(), "Post submission unsuccessful, see dialog for details", Toast.LENGTH_SHORT).show();
+                }
+
+                @Override
+                public void onCaptchaRequired(UserActions.CaptchaChallenge challenge) {
+                    UserActions.ActionCallback callback = this;
+                    CaptchaDialogFragment.show(getSupportFragmentManager(), challenge, new CaptchaDialogFragment.Listener() {
+                        @Override
+                        public void onCaptchaResponse(UserActions.CaptchaChallenge challenge, String captchaResponse) {
+                            if (challenge.isLoginChallenge()) {
+                                UserActions.submitAfterLoginCaptcha(postTitle, postText, postUrl, ComposeActivity.this, challenge, captchaResponse, callback);
+                            } else {
+                                UserActions.continueCaptchaAction(ComposeActivity.this, challenge, captchaResponse, callback);
+                            }
+                        }
+
+                        @Override
+                        public void onCaptchaCancelled() {
+                            resetSubmitButton(submitButton);
+                            Toast.makeText(view.getContext(), "Post submission requires completing the HN captcha", Toast.LENGTH_SHORT).show();
+                        }
+                    });
                 }
             });
         } else {
             final String commentText = editText.getText().toString();
 
-            UserActions.comment(String.valueOf(id), commentText, getApplicationContext(), new UserActions.ActionCallback() {
+            UserActions.comment(String.valueOf(id), commentText, view.getContext(), new UserActions.ActionCallback() {
                 @Override
                 public void onSuccess(Response response) {
                     submitButton.setIcon(AppCompatResources.getDrawable(getApplicationContext(), R.drawable.ic_action_send));
@@ -340,12 +364,33 @@ public class ComposeActivity extends AppCompatActivity {
 
                 @Override
                 public void onFailure(String summary, String response) {
-                    submitButton.setIcon(AppCompatResources.getDrawable(getApplicationContext(), R.drawable.ic_action_send));
-                    submitButton.setEnabled(true);
+                    resetSubmitButton(submitButton);
                     UserActions.showFailureDetailDialog(view.getContext(), summary, response + "\n\n" + "Here is your comment should you wish to copy it and try again:\n\n" + commentText, commentText);
                     Toast.makeText(view.getContext(), "Comment post unsuccessful, see dialog for details", Toast.LENGTH_SHORT).show();
                 }
+
+                @Override
+                public void onCaptchaRequired(UserActions.CaptchaChallenge challenge) {
+                    UserActions.ActionCallback callback = this;
+                    CaptchaDialogFragment.show(getSupportFragmentManager(), challenge, new CaptchaDialogFragment.Listener() {
+                        @Override
+                        public void onCaptchaResponse(UserActions.CaptchaChallenge challenge, String captchaResponse) {
+                            UserActions.continueCaptchaAction(ComposeActivity.this, challenge, captchaResponse, callback);
+                        }
+
+                        @Override
+                        public void onCaptchaCancelled() {
+                            resetSubmitButton(submitButton);
+                            Toast.makeText(view.getContext(), "Comment posting requires completing the HN captcha", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             });
         }
+    }
+
+    private void resetSubmitButton(MaterialButton submitButton) {
+        submitButton.setIcon(AppCompatResources.getDrawable(getApplicationContext(), R.drawable.ic_action_send));
+        updateEnabledStatuses();
     }
 }

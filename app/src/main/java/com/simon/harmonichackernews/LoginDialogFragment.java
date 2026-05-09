@@ -111,6 +111,72 @@ public class LoginDialogFragment extends AppCompatDialogFragment {
                     }
 
                     @Override
+                    public void onCaptchaRequired(UserActions.CaptchaChallenge challenge) {
+                        if (getContext() == null) {
+                            return;
+                        }
+
+                        loadingContainer.setVisibility(View.GONE);
+                        progressBar.setVisibility(View.GONE);
+
+                        CaptchaDialogFragment.show(getParentFragmentManager(), challenge, new CaptchaDialogFragment.Listener() {
+                            @Override
+                            public void onCaptchaResponse(UserActions.CaptchaChallenge challenge, String captchaResponse) {
+                                if (getContext() == null) {
+                                    return;
+                                }
+
+                                loadingContainer.setVisibility(View.VISIBLE);
+                                progressBar.setVisibility(View.VISIBLE);
+
+                                UserActions.continueLoginWithCaptcha(getContext(), challenge, captchaResponse, new UserActions.ActionCallback() {
+                                    @Override
+                                    public void onSuccess(Response response) {
+                                        if (getContext() == null) {
+                                            return;
+                                        }
+
+                                        Utils.toast("Login successful", getContext());
+                                        dismiss();
+                                    }
+
+                                    @Override
+                                    public void onFailure(String summary, String response) {
+                                        if (getContext() == null) {
+                                            return;
+                                        }
+
+                                        AccountUtils.deleteAccountDetails(getContext());
+                                        loadingContainer.setVisibility(View.GONE);
+                                        progressBar.setVisibility(View.GONE);
+                                        usernameInput.setEnabled(true);
+                                        passwordInput.setEnabled(true);
+                                        cancelButton.setEnabled(true);
+                                        saveButton.setEnabled(true);
+                                        errorText.setText("Login failed. Check your username and password, then try again.");
+                                        errorText.setVisibility(View.VISIBLE);
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onCaptchaCancelled() {
+                                if (getContext() == null) {
+                                    return;
+                                }
+
+                                AccountUtils.deleteAccountDetails(getContext());
+                                usernameInput.setEnabled(true);
+                                passwordInput.setEnabled(true);
+                                cancelButton.setEnabled(true);
+                                saveButton.setEnabled(true);
+                                errorText.setText("Login requires completing the Hacker News captcha.");
+                                errorText.setVisibility(View.VISIBLE);
+                            }
+                        });
+                    }
+
+                    @Override
                     public void onFailure(String summary, String response) {
                         if (getContext() == null) {
                             return;

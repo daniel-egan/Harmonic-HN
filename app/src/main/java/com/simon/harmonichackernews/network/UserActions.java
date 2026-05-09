@@ -20,8 +20,13 @@ import com.simon.harmonichackernews.utils.EncryptedSharedPreferencesHelper;
 import com.simon.harmonichackernews.utils.Utils;
 
 import org.jetbrains.annotations.NotNull;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -72,6 +77,9 @@ private static final String REGEX_CREATE_ERROR_BODY = "<body>([^<]*)";
 private static final String HEADER_LOCATION = "location";
 private static final String HEADER_COOKIE = "cookie";
 private static final String HEADER_SET_COOKIE = "set-cookie";
+private static final String CAPTCHA_VALIDATION_TEXT = "Validation required. If this doesn't work, you can email";
+private static final String CAPTCHA_RESPONSE_PARAM = "g-recaptcha-response";
+private static final long MAX_RESPONSE_PREVIEW_BYTES = 1024 * 1024;
 
     public static void voteWithDir(Context ctx, int id, FragmentManager fm, String dir) {
         UserActions.vote(String.valueOf(id), dir, ctx, fm, new UserActions.ActionCallback() {
@@ -183,8 +191,12 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
                 .post(form)
                 .build();
 
-        Handler main = new Handler(ctx.getMainLooper());
         NetworkComponent.resetOkHttpClientCookieInstance();
+        executeLoginRequest(ctx, request, cb);
+    }
+
+    private static void executeLoginRequest(Context ctx, Request request, ActionCallback cb) {
+        Handler main = new Handler(ctx.getMainLooper());
         OkHttpClient client = NetworkComponent.getOkHttpClientInstanceWithCookies();
         client.newCall(request).enqueue(new Callback() {
             @Override
@@ -200,14 +212,20 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
                 }
                 try {
                     // Peek at a small part of the body to find fnid without consuming full stream
-                    String preview = response.peekBody(8192).string();
+                    String preview = response.peekBody(MAX_RESPONSE_PREVIEW_BYTES).string();
                     Matcher matcher = Pattern.compile(
                             "<input[^>]*name=\\\"fnid\\\"[^>]*value=\\\"([^\\\"]+)\\\""
                     ).matcher(preview);
                     if (preview.contains("Bad login.")) {
                         main.post(() -> cb.onFailure("Bad login", "Your credentials are invalid."));
-                    } else if (preview.contains("Validation required. If this doesn't work, you can email")) {
-                        main.post(() -> cb.onFailure("Rate limit reached", "HN is temporarily requiring users to complete a CAPTCHA to proceed. Harmonic does not yet support this, apologies for the inconvenience. You can try again later or go via the official website."));
+                    } else if (isCaptchaRequired(preview)) {
+                        CaptchaChallenge challenge = parseCaptchaChallenge(preview, true);
+                        response.close();
+                        if (challenge != null) {
+                            main.post(() -> cb.onCaptchaRequired(challenge));
+                        } else {
+                            main.post(() -> cb.onFailure("Captcha parsing error", "HN asked for a captcha, but Harmonic could not read the challenge form."));
+                        }
                     } else if (!matcher.find()) {
                         main.post(() -> cb.onFailure("Bad login", "Submit form not found"));
                     } else {
@@ -218,6 +236,10 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
                 }
             }
         });
+    }
+
+    public static void continueLoginWithCaptcha(Context ctx, CaptchaChallenge challenge, String captchaResponse, ActionCallback cb) {
+        executeLoginRequest(ctx, buildCaptchaRequest(challenge, captchaResponse), cb);
     }
 
     /**
@@ -238,37 +260,74 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
             }
 
             @Override
+            public void onCaptchaRequired(CaptchaChallenge challenge) {
+                main.post(() -> cb.onCaptchaRequired(challenge));
+            }
+
+            @Override
             public void onSuccess(Response loginResp) {
-                main.post(() -> {
-                    String html;
-                    try {
-                        html = loginResp.body().string();
-                    } catch (IOException e) {
-                        cb.onFailure("Error reading login response", e.getMessage());
-                        return;
-                    }
-                    Matcher m = Pattern.compile(
-                            "<input[^>]*name=\"fnid\"[^>]*value=\"([^\"]+)\""
-                    ).matcher(html);
-                    if (!m.find()) {
-                        cb.onFailure("HN submit form parsing error", "No fnid found on /submit");
-                        return;
-                    }
-                    String fnid = m.group(1);
-                    FormBody.Builder submitForm = new FormBody.Builder()
-                            .add("fnid", fnid)
-                            .add("fnop", "submit-page")
-                            .add("title", title)
-                            .add("url", url)
-                            .add("text", text);
-                    Request submitReq = new Request.Builder()
-                            .url(BASE_WEB_URL + "/" + SUBMIT_POST_PATH)
-                            .post(submitForm.build())
-                            .build();
-                    executeRequest(ctx, submitReq, cb, true);
-                });
+                main.post(() -> submitAfterSuccessfulLogin(title, text, url, ctx, cb, loginResp));
             }
         });
+    }
+
+    public static void submitAfterLoginCaptcha(String title,
+                                               String text,
+                                               String url,
+                                               Context ctx,
+                                               CaptchaChallenge challenge,
+                                               String captchaResponse,
+                                               ActionCallback cb) {
+        continueLoginWithCaptcha(ctx, challenge, captchaResponse, new ActionCallback() {
+            @Override
+            public void onSuccess(Response response) {
+                submitAfterSuccessfulLogin(title, text, url, ctx, cb, response);
+            }
+
+            @Override
+            public void onFailure(String summary, String response) {
+                cb.onFailure(summary, response);
+            }
+
+            @Override
+            public void onCaptchaRequired(CaptchaChallenge challenge) {
+                cb.onCaptchaRequired(challenge);
+            }
+        });
+    }
+
+    private static void submitAfterSuccessfulLogin(String title,
+                                                  String text,
+                                                  String url,
+                                                  Context ctx,
+                                                  ActionCallback cb,
+                                                  Response loginResp) {
+        String html;
+        try {
+            html = loginResp.body().string();
+        } catch (IOException e) {
+            cb.onFailure("Error reading login response", e.getMessage());
+            return;
+        }
+        Matcher m = Pattern.compile(
+                "<input[^>]*name=\"fnid\"[^>]*value=\"([^\"]+)\""
+        ).matcher(html);
+        if (!m.find()) {
+            cb.onFailure("HN submit form parsing error", "No fnid found on /submit");
+            return;
+        }
+        String fnid = m.group(1);
+        FormBody.Builder submitForm = new FormBody.Builder()
+                .add("fnid", fnid)
+                .add("fnop", "submit-page")
+                .add("title", title)
+                .add("url", url)
+                .add("text", text);
+        Request submitReq = new Request.Builder()
+                .url(BASE_WEB_URL + "/" + SUBMIT_POST_PATH)
+                .post(submitForm.build())
+                .build();
+        executeRequest(ctx, submitReq, cb, true);
     }
 
     public static void executeRequest(Context ctx, Request request, ActionCallback cb) {
@@ -309,8 +368,13 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
                         AccountUtils.deleteAccountDetails(ctx);
                         cb.onFailure("Bad login",
                                 "Your session has expired or credentials are invalid. Logged out.");
-                    } else if (body.contains("Validation required. If this doesn't work, you can email")) {
-                        cb.onFailure("Rate limit reached", "HN is temporarily requiring users to complete a CAPTCHA to proceed. Harmonic does not yet support this, apologies for the inconvenience. You can try again later or go via the official website.");
+                    } else if (isCaptchaRequired(body)) {
+                        CaptchaChallenge challenge = parseCaptchaChallenge(body, cookies);
+                        if (challenge != null) {
+                            cb.onCaptchaRequired(challenge);
+                        } else {
+                            cb.onFailure("Captcha parsing error", "HN asked for a captcha, but Harmonic could not read the challenge form.");
+                        }
                     } else {
                         // HN will send a 302 → the new post, but OkHttp follows redirects by default.
                         cb.onSuccess(response);
@@ -323,6 +387,117 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
                 mainHandler.post(() -> cb.onFailure("Couldn't connect to HN", e.getMessage()));
             }
         });
+    }
+
+    public static void continueCaptchaAction(Context ctx, CaptchaChallenge challenge, String captchaResponse, ActionCallback cb) {
+        executeRequest(ctx, buildCaptchaRequest(challenge, captchaResponse), cb, challenge.useCookies());
+    }
+
+    private static Request buildCaptchaRequest(CaptchaChallenge challenge, String captchaResponse) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        for (Pair<String, String> field : challenge.getFormFields()) {
+            formBuilder.add(field.first, field.second == null ? "" : field.second);
+        }
+        formBuilder.add(CAPTCHA_RESPONSE_PARAM, captchaResponse);
+
+        return new Request.Builder()
+                .url(challenge.getActionUrl())
+                .post(formBuilder.build())
+                .build();
+    }
+
+    private static boolean isCaptchaRequired(String body) {
+        return body != null && body.contains(CAPTCHA_VALIDATION_TEXT) && body.contains("g-recaptcha");
+    }
+
+    private static CaptchaChallenge parseCaptchaChallenge(String body, boolean cookies) {
+        Document document = Jsoup.parse(body, BASE_WEB_URL + "/");
+        Element form = document.selectFirst("form[action]");
+        Element captcha = document.selectFirst(".g-recaptcha[data-sitekey]");
+
+        if (form == null || captcha == null) {
+            return null;
+        }
+
+        String actionUrl = form.absUrl("action");
+        if (TextUtils.isEmpty(actionUrl)) {
+            HttpUrl parsedBase = HttpUrl.parse(BASE_WEB_URL);
+            if (parsedBase == null) {
+                return null;
+            }
+            actionUrl = parsedBase.newBuilder()
+                    .addPathSegment(form.attr("action"))
+                    .build()
+                    .toString();
+        }
+
+        String siteKey = captcha.attr("data-sitekey");
+        if (TextUtils.isEmpty(siteKey)) {
+            return null;
+        }
+
+        ArrayList<Pair<String, String>> formFields = new ArrayList<>();
+        for (Element input : form.select("input[name], textarea[name]")) {
+            String name = input.attr("name");
+            String type = input.attr("type");
+            if (TextUtils.isEmpty(name)
+                    || CAPTCHA_RESPONSE_PARAM.equals(name)
+                    || "submit".equalsIgnoreCase(type)
+                    || "button".equalsIgnoreCase(type)) {
+                continue;
+            }
+
+            formFields.add(new Pair<>(name, input.val()));
+        }
+
+        return new CaptchaChallenge(actionUrl, siteKey, formFields, cookies);
+    }
+
+    public static class CaptchaChallenge {
+        private final String actionUrl;
+        private final String siteKey;
+        private final ArrayList<Pair<String, String>> formFields;
+        private final boolean cookies;
+
+        private CaptchaChallenge(String actionUrl,
+                                 String siteKey,
+                                 ArrayList<Pair<String, String>> formFields,
+                                 boolean cookies) {
+            this.actionUrl = actionUrl;
+            this.siteKey = siteKey;
+            this.formFields = formFields;
+            this.cookies = cookies;
+        }
+
+        public String getActionUrl() {
+            return actionUrl;
+        }
+
+        public String getCaptchaHtml() {
+            String safeSiteKey = TextUtils.htmlEncode(siteKey);
+            return "<!doctype html><html><head>"
+                    + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                    + "<script src=\"https://www.google.com/recaptcha/api.js\" async defer></script>"
+                    + "<style>body{margin:0;padding:16px;background:#fff;font-family:sans-serif;} .wrap{min-height:420px;}</style>"
+                    + "</head><body><div class=\"wrap\"><div class=\"g-recaptcha\" data-sitekey=\""
+                    + safeSiteKey
+                    + "\"></div></div></body></html>";
+        }
+
+        private List<Pair<String, String>> getFormFields() {
+            return formFields;
+        }
+
+        private boolean useCookies() {
+            return cookies;
+        }
+
+        public boolean isLoginChallenge() {
+            HttpUrl url = HttpUrl.parse(actionUrl);
+            return url != null
+                    && url.pathSegments().size() == 1
+                    && LOGIN_PATH.equals(url.pathSegments().get(0));
+        }
     }
 
 
@@ -371,5 +546,9 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
     public interface ActionCallback {
         void onSuccess(Response response);
         void onFailure(String summary, String response);
+
+        default void onCaptchaRequired(CaptchaChallenge challenge) {
+            onFailure("Captcha required", "HN requires a captcha for this action. Please try again in a browser.");
+        }
     }
 }
