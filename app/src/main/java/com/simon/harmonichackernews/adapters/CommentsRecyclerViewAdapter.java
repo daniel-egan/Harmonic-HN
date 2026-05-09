@@ -91,6 +91,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public boolean integratedWebview;
     public boolean showTopLevelDepthIndicator;
     public boolean swapLongPressTap;
+    public boolean cardStyle;
     public String username;
     public int preferredTextSize;
     private final boolean isTablet;
@@ -105,6 +106,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public static final int TYPE_HEADER = 0;
     public static final int TYPE_COMMENT = 1;
     public static final int TYPE_COLLAPSED = 2;
+    public static final int TYPE_COMMENT_CARD = 3;
 
     public final static int FLAG_ACTION_CLICK_USER = 0;
     public final static int FLAG_ACTION_CLICK_COMMENT = 1;
@@ -131,10 +133,11 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                                        boolean shouldShowInvert,
                                        boolean shouldShowTopLevelDepthIndicator,
                                        String prefTheme,
-                                       boolean tablet,
-                                       String favProvider,
-                                       boolean shouldSwapLongPressTap,
-                                       CommentsRecyclerViewAdapter.RequestSummaryCallback requestSummaryCallback) {
+                                        boolean tablet,
+                                        String favProvider,
+                                        boolean shouldSwapLongPressTap,
+                                        boolean shouldUseCardStyle,
+                                        CommentsRecyclerViewAdapter.RequestSummaryCallback requestSummaryCallback) {
         integratedWebview = useIntegratedWebview;
         bottomSheet = sheet;
         fragmentManager = fm;
@@ -153,15 +156,16 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         isTablet = tablet;
         faviconProvider = favProvider;
         swapLongPressTap = shouldSwapLongPressTap;
+        cardStyle = shouldUseCardStyle;
         summaryCallback = requestSummaryCallback;
     }
 
     @NotNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        if (viewType == TYPE_COMMENT) {
+        if (isCommentViewType(viewType)) {
             View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.comments_item, parent, false);
+                    .inflate(viewType == TYPE_COMMENT_CARD ? R.layout.comments_item_card : R.layout.comments_item, parent, false);
             return new ItemViewHolder(view);
         } else if (viewType == TYPE_COLLAPSED) {
             return new RecyclerView.ViewHolder(new View(parent.getContext())) {
@@ -563,16 +567,24 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                 width /= 2;
             }
 
-            // 16 is base padding, then add 12 for each comment
+            int horizontalStartMargin = Math.min(
+                    Utils.pxFromDpInt(ctx.getResources(), 16 + 12 * comment.depth),
+                    Math.round(((float) width) * 0.6f));
+            int topMargin = Utils.pxFromDpInt(
+                    ctx.getResources(),
+                    cardStyle ? (comment.depth > 0 && !collapseParent ? 6 : 4) : (comment.depth > 0 && !collapseParent ? 10 : 6));
+            int bottomMargin = Utils.pxFromDpInt(ctx.getResources(), cardStyle ? 4 : 6);
+
+            // 16 is base padding, then add depth-based indentation for child comments.
             params.setMargins(
-                    Math.min(Utils.pxFromDpInt(ctx.getResources(), 16 + 12 * comment.depth), Math.round(((float) width) * 0.6f)),
-                    Utils.pxFromDpInt(ctx.getResources(), comment.depth > 0 && !collapseParent ? 10 : 6),
+                    horizontalStartMargin,
+                    topMargin,
                     Utils.pxFromDpInt(ctx.getResources(), 16),
-                    Utils.pxFromDpInt(ctx.getResources(), 6));
+                    bottomMargin);
             itemViewHolder.itemView.setLayoutParams(params);
 
             if (comment.depth == 0 && !showTopLevelDepthIndicator) {
-                itemViewHolder.commentIndentIndicator.setVisibility(GONE);
+                itemViewHolder.commentIndentIndicator.setVisibility(cardStyle ? View.INVISIBLE : GONE);
             } else {
                 itemViewHolder.commentIndentIndicator.setVisibility(View.VISIBLE);
                 int index = (comment.depth + (showTopLevelDepthIndicator ? 0 : -1)) % 7;
@@ -662,8 +674,16 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         if (position == 0) {
             return TYPE_HEADER;
         } else {
-            return shouldShow(comments.get(position)) ? TYPE_COMMENT : TYPE_COLLAPSED;
+            return shouldShow(comments.get(position)) ? getCommentViewType() : TYPE_COLLAPSED;
         }
+    }
+
+    public int getCommentViewType() {
+        return cardStyle ? TYPE_COMMENT_CARD : TYPE_COMMENT;
+    }
+
+    public static boolean isCommentViewType(int viewType) {
+        return viewType == TYPE_COMMENT || viewType == TYPE_COMMENT_CARD;
     }
 
     public class ItemViewHolder extends RecyclerView.ViewHolder {

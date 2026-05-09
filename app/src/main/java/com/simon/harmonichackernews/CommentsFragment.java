@@ -683,6 +683,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 Utils.isTablet(getResources()),
                 SettingsUtils.getPreferredFaviconProvider(getContext()),
                 SettingsUtils.shouldSwapCommentLongPressTap(getContext()),
+                SettingsUtils.shouldUseCardCommentDisplayStyle(getContext()),
                 this);
         adapter.loadUserTags(requireContext());
 
@@ -940,6 +941,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         recyclerView.setAdapter(adapter);
 
         recyclerView.getRecycledViewPool().setMaxRecycledViews(CommentsRecyclerViewAdapter.TYPE_COMMENT, 300);
+        recyclerView.getRecycledViewPool().setMaxRecycledViews(CommentsRecyclerViewAdapter.TYPE_COMMENT_CARD, 300);
         recyclerView.getRecycledViewPool().setMaxRecycledViews(CommentsRecyclerViewAdapter.TYPE_COLLAPSED, 600);
         recyclerView.getRecycledViewPool().setMaxRecycledViews(CommentsRecyclerViewAdapter.TYPE_HEADER, 1);
     }
@@ -1330,6 +1332,11 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 adapter.swapLongPressTap = SettingsUtils.shouldSwapCommentLongPressTap(ctx);
             }
 
+            if (adapter.cardStyle != SettingsUtils.shouldUseCardCommentDisplayStyle(ctx)) {
+                adapter.cardStyle = SettingsUtils.shouldUseCardCommentDisplayStyle(ctx);
+                updateComments = true;
+            }
+
             if (!adapter.theme.equals(ThemeUtils.getPreferredTheme(ctx))) {
                 adapter.theme = ThemeUtils.getPreferredTheme(ctx);
                 updateHeader = true;
@@ -1349,7 +1356,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 adapter.notifyItemChanged(0);
             }
             if (updateComments) {
-                adapter.notifyItemRangeChanged(1, comments.size());
+                adapter.notifyDataSetChanged();
             }
         }
     }
@@ -2225,7 +2232,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
         int visibleComments = 0;
         for (int i = 1; i <= targetPosition && i < adapter.getItemCount(); i++) {
-            if (adapter.getItemViewType(i) == CommentsRecyclerViewAdapter.TYPE_COMMENT) {
+            if (CommentsRecyclerViewAdapter.isCommentViewType(adapter.getItemViewType(i))) {
                 visibleComments++;
             }
         }

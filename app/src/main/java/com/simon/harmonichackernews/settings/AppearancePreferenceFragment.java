@@ -26,6 +26,7 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
 
         updateTimedRangeSummary();
         updateStoryDisplayStyleSummary(SettingsUtils.getPreferredStoryDisplayStyle(requireContext()));
+        updateCommentDisplayStyleSummary(SettingsUtils.getPreferredCommentDisplayStyle(requireContext()));
 
         boolean specialNighttime = SettingsUtils.shouldUseSpecialNighttimeTheme(getContext());
         changePrefStatus(findPreference("pref_theme_timed_range"), specialNighttime);
@@ -33,6 +34,11 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
 
         findPreference(SettingsUtils.PREF_STORY_DISPLAY_STYLE).setOnPreferenceChangeListener((preference, newValue) -> {
             updateStoryDisplayStyleSummary((String) newValue);
+            return true;
+        });
+
+        findPreference(SettingsUtils.PREF_COMMENT_DISPLAY_STYLE).setOnPreferenceChangeListener((preference, newValue) -> {
+            updateCommentDisplayStyleSummary((String) newValue);
             return true;
         });
 
@@ -115,6 +121,11 @@ public class AppearancePreferenceFragment extends BaseSettingsFragment {
     private void updateStoryDisplayStyleSummary(String style) {
         findPreference("pref_story_display_style_summary").setSummary(
                 SettingsUtils.STORY_DISPLAY_STYLE_CARD.equals(style) ? "Card" : "Standard");
+    }
+
+    private void updateCommentDisplayStyleSummary(String style) {
+        findPreference("pref_comment_display_style_summary").setSummary(
+                SettingsUtils.COMMENT_DISPLAY_STYLE_CARD.equals(style) ? "Card" : "Standard");
     }
 
     private String getNighttimeTheme() {

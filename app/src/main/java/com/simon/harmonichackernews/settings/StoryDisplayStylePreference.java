@@ -20,7 +20,7 @@ public class StoryDisplayStylePreference extends Preference {
 
     public StoryDisplayStylePreference(Context context, AttributeSet attrs) {
         super(context, attrs);
-        setLayoutResource(R.layout.preference_story_display_style);
+        setLayoutResource(getDisplayStyleLayoutResource());
         setSelectable(false);
     }
 
@@ -35,30 +35,30 @@ public class StoryDisplayStylePreference extends Preference {
         holder.itemView.setClickable(false);
         holder.itemView.setFocusable(false);
 
-        String style = getPersistedString(SettingsUtils.STORY_DISPLAY_STYLE_STANDARD);
-        boolean cardSelected = SettingsUtils.STORY_DISPLAY_STYLE_CARD.equals(style);
+        String style = getPersistedString(getDefaultStyle());
+        boolean cardSelected = getCardStyle().equals(style);
 
-        MaterialCardView standardCard = (MaterialCardView) holder.findViewById(R.id.story_display_style_standard);
-        MaterialCardView cardCard = (MaterialCardView) holder.findViewById(R.id.story_display_style_card);
+        MaterialCardView standardCard = (MaterialCardView) holder.findViewById(getStandardCardId());
+        MaterialCardView cardCard = (MaterialCardView) holder.findViewById(getCardCardId());
 
         bindOptionCard(
                 standardCard,
                 !cardSelected,
-                "Standard story display style");
+                "Standard " + getDisplayStyleName() + " display style");
         bindOptionCard(
                 cardCard,
                 cardSelected,
-                "Card story display style");
+                "Card " + getDisplayStyleName() + " display style");
 
         if (standardCard != null) {
             standardCard.setOnClickListener(v -> selectStyle(
-                    SettingsUtils.STORY_DISPLAY_STYLE_STANDARD,
+                    getStandardStyle(),
                     standardCard,
                     cardCard));
         }
         if (cardCard != null) {
             cardCard.setOnClickListener(v -> selectStyle(
-                    SettingsUtils.STORY_DISPLAY_STYLE_CARD,
+                    getCardStyle(),
                     cardCard,
                     standardCard));
         }
@@ -78,7 +78,7 @@ public class StoryDisplayStylePreference extends Preference {
             String style,
             MaterialCardView selectedCard,
             MaterialCardView unselectedCard) {
-        String oldStyle = getPersistedString(SettingsUtils.STORY_DISPLAY_STYLE_STANDARD);
+        String oldStyle = getPersistedString(getDefaultStyle());
         if (oldStyle.equals(style)) {
             return;
         }
@@ -157,5 +157,33 @@ public class StoryDisplayStylePreference extends Preference {
                     .setDuration(SELECTION_ANIMATION_DURATION_MS)
                     .start();
         }
+    }
+
+    protected int getDisplayStyleLayoutResource() {
+        return R.layout.preference_story_display_style;
+    }
+
+    protected int getStandardCardId() {
+        return R.id.story_display_style_standard;
+    }
+
+    protected int getCardCardId() {
+        return R.id.story_display_style_card;
+    }
+
+    protected String getDefaultStyle() {
+        return SettingsUtils.STORY_DISPLAY_STYLE_STANDARD;
+    }
+
+    protected String getStandardStyle() {
+        return SettingsUtils.STORY_DISPLAY_STYLE_STANDARD;
+    }
+
+    protected String getCardStyle() {
+        return SettingsUtils.STORY_DISPLAY_STYLE_CARD;
+    }
+
+    protected String getDisplayStyleName() {
+        return "story";
     }
 }

@@ -18,8 +18,11 @@ public class SettingsUtils {
     public static final String PREF_COMMENT_DEPTH_INDICATORS = "pref_comment_depth_indicators";
     public static final String PREF_MONOCHROME_COMMENT_DEPTH = "pref_monochrome_comment_depth";
     public static final String PREF_STORY_DISPLAY_STYLE = "pref_story_display_style";
+    public static final String PREF_COMMENT_DISPLAY_STYLE = "pref_comment_display_style";
     public static final String STORY_DISPLAY_STYLE_STANDARD = "standard";
     public static final String STORY_DISPLAY_STYLE_CARD = "card";
+    public static final String COMMENT_DISPLAY_STYLE_STANDARD = STORY_DISPLAY_STYLE_STANDARD;
+    public static final String COMMENT_DISPLAY_STYLE_CARD = STORY_DISPLAY_STYLE_CARD;
 
     public static Set<Integer> readIntSetFromSharedPreferences(Context ctx, String key) {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
@@ -210,6 +213,19 @@ public class SettingsUtils {
 
     public static boolean shouldUseCardStoryDisplayStyle(Context ctx) {
         return STORY_DISPLAY_STYLE_CARD.equals(getPreferredStoryDisplayStyle(ctx));
+    }
+
+    public static String getPreferredCommentDisplayStyle(Context ctx) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        String style = prefs.getString(PREF_COMMENT_DISPLAY_STYLE, COMMENT_DISPLAY_STYLE_STANDARD);
+        if (COMMENT_DISPLAY_STYLE_CARD.equals(style)) {
+            return COMMENT_DISPLAY_STYLE_CARD;
+        }
+        return COMMENT_DISPLAY_STYLE_STANDARD;
+    }
+
+    public static boolean shouldUseCardCommentDisplayStyle(Context ctx) {
+        return COMMENT_DISPLAY_STYLE_CARD.equals(getPreferredCommentDisplayStyle(ctx));
     }
 
     public static boolean shouldUseTransparentStatusBar(Context ctx) {
