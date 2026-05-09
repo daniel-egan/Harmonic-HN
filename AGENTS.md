@@ -30,3 +30,7 @@ If a change touches UI, resources, manifests, or other Android configuration tha
 ```
 
 Use `assembleDebug` for the normal edit/verify loop, and add `lintDebug` when the change justifies the extra time.
+
+## Device Verification
+
+Do not run or control a connected Android device or emulator unless the user explicitly asks for device verification. When asked, use `adb devices` to confirm it is online. To verify UI changes, install the debug APK with `adb install -r app/build/outputs/apk/debug/app-debug.apk`, launch the app with `adb shell monkey -p com.simon.harmonichackernews -c android.intent.category.LAUNCHER 1`, navigate with `adb shell input tap ...` or inspect the hierarchy with `adb shell uiautomator dump`, and capture screenshots with `adb shell screencap -p /sdcard/<name>.png` followed by `adb pull`.
