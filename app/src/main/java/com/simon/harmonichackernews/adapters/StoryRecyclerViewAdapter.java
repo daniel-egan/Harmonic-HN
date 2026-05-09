@@ -55,6 +55,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     private static final int TYPE_STORY_LEFT = 5;
     private static final int TYPE_STORY_CARD = 6;
     private static final int TYPE_STORY_CARD_LEFT = 7;
+    private static final int TYPE_COMMENT_CARD = 8;
 
     public boolean showPoints;
     public boolean showCommentsCount;
@@ -113,7 +114,8 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
         } else if (viewType == TYPE_LOAD_MORE_BUTTON) {
             return new LoadMoreViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.load_more_button, parent, false));
         } else {
-            return new CommentViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.submissions_comment, parent, false));
+            int layout = viewType == TYPE_COMMENT_CARD ? R.layout.submissions_comment_card : R.layout.submissions_comment;
+            return new CommentViewHolder(LayoutInflater.from(parent.getContext()).inflate(layout, parent, false));
         }
     }
 
@@ -288,7 +290,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     @Override
     public int getItemViewType(int position) {
         if (atSubmissions) {
-            return stories.get(position).isComment ? TYPE_COMMENT : getStoryViewType();
+            return stories.get(position).isComment ? getCommentViewType() : getStoryViewType();
         }
 
         if (paginationMode && position == visibleStoryCount && visibleStoryCount < stories.size()) {
@@ -296,7 +298,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
         }
 
         if (allowCommentRows && stories.get(position).isComment) {
-            return TYPE_COMMENT;
+            return getCommentViewType();
         }
 
         return getStoryViewType();
@@ -399,7 +401,12 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
 
             GradientDrawable gradientDrawable = new GradientDrawable(
                     GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{Color.TRANSPARENT, ContextCompat.getColor(ctx, ThemeUtils.getBackgroundColorResource(ctx))});
+                    new int[]{
+                            Color.TRANSPARENT,
+                            view.findViewById(R.id.submissions_comment_card) != null
+                                    ? Utils.getColorViaAttr(ctx, com.google.android.material.R.attr.colorSurfaceContainerHigh)
+                                    : ContextCompat.getColor(ctx, ThemeUtils.getBackgroundColorResource(ctx))
+                    });
 
             scrim.setBackground(gradientDrawable);
 
@@ -513,6 +520,10 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             return leftAlign ? TYPE_STORY_CARD_LEFT : TYPE_STORY_CARD;
         }
         return leftAlign ? TYPE_STORY_LEFT : TYPE_STORY;
+    }
+
+    private int getCommentViewType() {
+        return cardStyle ? TYPE_COMMENT_CARD : TYPE_COMMENT;
     }
 
     private static boolean isStoryViewType(int viewType) {
