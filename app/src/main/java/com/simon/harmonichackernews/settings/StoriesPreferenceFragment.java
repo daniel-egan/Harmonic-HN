@@ -24,6 +24,7 @@ public class StoriesPreferenceFragment extends BaseSettingsFragment {
         setPreferencesFromResource(R.xml.preferences_stories, rootKey);
 
         boolean compact = SettingsUtils.shouldUseCompactView(getContext());
+        StoryContentPreviewPreference previewPreference = findPreference("pref_story_content_preview");
 
         changePrefStatus(findPreference("pref_show_points"), !compact);
         changePrefStatus(findPreference("pref_show_comments_count"), !compact);
@@ -36,15 +37,35 @@ public class StoriesPreferenceFragment extends BaseSettingsFragment {
         }
 
         findPreference("pref_compact_view").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updateCompact((boolean) newValue);
+            }
             changePrefStatus(findPreference("pref_show_points"), !(boolean) newValue);
             changePrefStatus(findPreference("pref_show_comments_count"), !(boolean) newValue);
             changePrefStatus(findPreference("pref_thumbnails"), !(boolean) newValue);
-            changePrefStatus(findPreference("pref_favicon_provider"), !(boolean) newValue);
+            changePrefStatus(findPreference("pref_favicon_provider"), !(boolean) newValue && SettingsUtils.shouldShowThumbnails(getContext()));
             return true;
         });
 
         findPreference("pref_thumbnails").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updateThumbnails((boolean) newValue);
+            }
             changePrefStatus(findPreference("pref_favicon_provider"), (boolean) newValue);
+            return true;
+        });
+
+        findPreference("pref_show_points").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updatePoints((boolean) newValue);
+            }
+            return true;
+        });
+
+        findPreference("pref_show_comments_count").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updateCommentsCount((boolean) newValue);
+            }
             return true;
         });
 

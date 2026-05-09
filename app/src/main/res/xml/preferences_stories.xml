@@ -40,6 +40,9 @@
         app:title="Content"
         android:layout="@layout/preference_category">
 
+        <com.simon.harmonichackernews.settings.StoryContentPreviewPreference
+            app:key="pref_story_content_preview" />
+
         <SwitchPreferenceCompat
             app:singleLineTitle="false"
             app:defaultValue="true"
