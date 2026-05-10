@@ -11,7 +11,7 @@
     <Preference
         app:key="pref_header_stories"
         app:title="Stories"
-        app:summary="Layout, behaviorCompact view, thumbnails, pagination"
+        app:summary="Layout, behavior"
         app:icon="@drawable/ic_action_bookmark_border"
         app:fragment="com.simon.harmonichackernews.settings.StoriesPreferenceFragment" />
 

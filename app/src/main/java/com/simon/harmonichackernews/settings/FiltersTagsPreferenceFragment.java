@@ -26,6 +26,19 @@ public class FiltersTagsPreferenceFragment extends BaseSettingsFragment {
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.preferences_filters_tags, rootKey);
 
+        setupFilterPreference(
+                "pref_filter",
+                "Word or phrase",
+                "No story title filters");
+        setupFilterPreference(
+                "pref_filter_domains",
+                "Domain",
+                "No domain filters");
+        setupFilterPreference(
+                "pref_filter_users",
+                "Username",
+                "No user filters");
+
         tagsCategory = findPreference("pref_category_tags");
         updateUserTags();
     }
@@ -96,5 +109,22 @@ public class FiltersTagsPreferenceFragment extends BaseSettingsFragment {
         for (Preference preference : preferencesToRemove) {
             tagsCategory.removePreference(preference);
         }
+    }
+
+    private void setupFilterPreference(String key, String inputHint, String emptyMessage) {
+        Preference preference = findPreference(key);
+        if (preference == null) {
+            return;
+        }
+
+        preference.setOnPreferenceClickListener(clickedPreference -> {
+            FilterListDialogFragment.show(
+                    getParentFragmentManager(),
+                    clickedPreference.getKey(),
+                    String.valueOf(clickedPreference.getTitle()),
+                    inputHint,
+                    emptyMessage);
+            return true;
+        });
     }
 }
