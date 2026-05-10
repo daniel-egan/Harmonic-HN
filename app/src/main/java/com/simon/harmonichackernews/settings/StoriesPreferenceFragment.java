@@ -5,7 +5,6 @@ import android.content.ComponentName;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
-import androidx.preference.Preference;
 
 import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.utils.SettingsUtils;
@@ -102,14 +101,6 @@ public class StoriesPreferenceFragment extends BaseSettingsFragment {
             SettingsCallback callback = getSettingsCallback();
             if (callback != null) {
                 callback.onRequestRestart();
-            }
-            return true;
-        });
-
-        findPreference("pref_foldable_support").setOnPreferenceChangeListener((preference, newValue) -> {
-            SettingsCallback callback = getSettingsCallback();
-            if (callback != null) {
-                callback.onRequestFullRestart();
             }
             return true;
         });

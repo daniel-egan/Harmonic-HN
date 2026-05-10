@@ -24,7 +24,7 @@ public class FoldableSplitInitializer implements Initializer<RuleController> {
          return ruleController;
       }
 
-      setFoldableSupport(context, SettingsUtils.shouldEnableFoldableSupport(context));
+      ruleController.setRules(RuleController.parseRules(context, R.xml.main_split_config));
       return ruleController;
    }
 
@@ -32,14 +32,6 @@ public class FoldableSplitInitializer implements Initializer<RuleController> {
    @Override
    public List<Class<? extends Initializer<?>>> dependencies() {
       return Collections.emptyList();
-   }
-
-   private void setFoldableSupport(Context context, boolean enabled) {
-      if (enabled) {
-         ruleController.setRules(RuleController.parseRules(context, R.xml.main_split_config));
-      } else {
-         ruleController.clearRules();
-      }
    }
 
    public static boolean isSplitSupported(Context context) {

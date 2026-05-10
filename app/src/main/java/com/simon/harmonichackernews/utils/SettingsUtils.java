@@ -164,10 +164,6 @@ public class SettingsUtils {
         return getBooleanPref("pref_webview", true, ctx);
     }
 
-    public static boolean shouldEnableFoldableSupport(Context ctx) {
-        return getBooleanPref("pref_foldable_support", false, ctx);
-    }
-
     public static String shouldPreloadWebView(Context ctx) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
         return prefs.getString("pref_preload_webview", "never");
