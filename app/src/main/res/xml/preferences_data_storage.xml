@@ -22,7 +22,7 @@
             app:singleLineTitle="false"
             app:key="pref_export_bookmarks"
             app:title="Export bookmarks"
-            app:summary="Exports to text file where first number of each line is post ID"
+            app:summary="Save newline separated txt file with IDs"
             app:icon="@drawable/ic_action_bookmark_border" />
 
         <Preference

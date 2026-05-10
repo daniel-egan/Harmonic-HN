@@ -142,10 +142,9 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
 
             HistoriesUtils.INSTANCE.clearHistories(requireContext());
 
-            Snackbar.make(
-                    requireView(),
+            Utils.toast(
                     "Cleared " + oldCount + (oldCount == 1 ? " entry" : " entries"),
-                    Snackbar.LENGTH_SHORT).show();
+                    requireContext());
 
             return false;
         });
@@ -153,10 +152,9 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
         findPreference("pref_clear_post_cache").setOnPreferenceClickListener(preference -> {
             int oldCount = Utils.clearPostCache(requireContext());
 
-            Snackbar.make(
-                    requireView(),
+            Utils.toast(
                     "Cleared " + oldCount + " cached " + (oldCount == 1 ? "post" : "posts"),
-                    Snackbar.LENGTH_SHORT).show();
+                    requireContext());
 
             return false;
         });
