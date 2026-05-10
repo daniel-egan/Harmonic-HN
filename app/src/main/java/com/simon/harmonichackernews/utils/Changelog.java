@@ -9,6 +9,7 @@ public class Changelog {
                 "- Added new story display style: Card<br>" +
                 "- Updated many parts of settings with previews<br>" +
                 "- Added support for HN CAPTCHAs<br>" +
+                "- Always enable foldable support<br>" +
                 "<br>" +
                 "<b>Version 2.4:</b><br>" +
                 "- Redesigned search, including adding search options<br>" +
