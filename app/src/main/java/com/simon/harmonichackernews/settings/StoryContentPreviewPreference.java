@@ -163,7 +163,19 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         storyMeta = itemView.findViewById(R.id.story_meta);
         comments = itemView.findViewById(R.id.story_comments);
 
+        disablePreviewTextScrolling(storyTitle);
+        disablePreviewTextScrolling(storyIndex);
+        disablePreviewTextScrolling(storyMeta);
+        disablePreviewTextScrolling(comments);
         bindStaticPreviewContent();
+    }
+
+    private void disablePreviewTextScrolling(TextView textView) {
+        if (textView == null) {
+            return;
+        }
+
+        textView.setVerticalScrollBarEnabled(false);
     }
 
     @SuppressLint("SetTextI18n")
