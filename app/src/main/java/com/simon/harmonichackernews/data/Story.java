@@ -35,6 +35,7 @@ public class Story {
     public ArxivInfo arxivInfo;
     public WikipediaInfo wikiInfo;
     public NitterInfo nitterInfo;
+    public transient boolean linkPreviewLoading;
 
     public boolean isLink;
     public boolean isJob = false;
@@ -104,6 +105,10 @@ public class Story {
     }
 
     public boolean hasExtraInfo() {
+        return linkPreviewLoading || hasLoadedLinkPreview();
+    }
+
+    public boolean hasLoadedLinkPreview() {
         return arxivInfo != null || gitLabInfo != null || repoInfo != null || stackExchangeInfo != null || wikiInfo != null || nitterInfo != null;
     }
 

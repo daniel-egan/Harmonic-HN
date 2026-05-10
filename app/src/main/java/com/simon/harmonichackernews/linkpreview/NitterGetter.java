@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 public class NitterGetter {
 
     public static boolean isValidNitterUrl(String url) {
-        return url.contains("nitter.net");
+        return url != null && url.contains("nitter.net");
     }
 
     public static boolean isConvertibleToNitter(String url) {
@@ -86,8 +86,9 @@ public class NitterGetter {
                 "   if (videoImage) {" +
                 "       return { imgSrc: absoluteUrl(videoImage.getAttribute('src')), hasVideo: true };" +
                 "   }" +
-                "   var image = parent.querySelector('.attachment.image img');" +
-                "   return { imgSrc: absoluteUrl(image ? image.getAttribute('src') : null), hasVideo: false };" +
+                "   var imageLink = parent.querySelector('.attachments a.still-image[href], .gallery-row a.still-image[href], .attachment a.still-image[href], a.still-image[href]');" +
+                "   var image = parent.querySelector('.attachments img, .gallery-row img, .attachment img');" +
+                "   return { imgSrc: absoluteUrl(imageLink ? imageLink.getAttribute('href') : (image ? image.getAttribute('src') : null)), hasVideo: false };" +
                 "}" +
                 "var mainTweet = document.querySelector('.main-tweet');" +
                 "var beforeTweet = document.querySelector('.before-tweet');" +

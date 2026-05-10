@@ -197,6 +197,19 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             headerViewHolder.linkImage.setVisibility(story.isLink && !story.isComment ? View.VISIBLE : GONE);
             headerViewHolder.textView.setVisibility(TextUtils.isEmpty(story.text) ? GONE : View.VISIBLE);
             headerViewHolder.infoContainer.setVisibility(story.hasExtraInfo() ? View.VISIBLE : GONE);
+            boolean hasLoadedLinkPreview = story.hasLoadedLinkPreview();
+            boolean showLinkPreviewLoading = story.linkPreviewLoading && !hasLoadedLinkPreview;
+            headerViewHolder.infoHeader.setVisibility(hasLoadedLinkPreview ? VISIBLE : GONE);
+            headerViewHolder.linkPreviewLoadingContainer.setVisibility(showLinkPreviewLoading ? VISIBLE : GONE);
+            headerViewHolder.arxivContainer.setVisibility(GONE);
+            headerViewHolder.githubContainer.setVisibility(GONE);
+            headerViewHolder.gitLabContainer.setVisibility(GONE);
+            headerViewHolder.stackExchangeContainer.setVisibility(GONE);
+            headerViewHolder.wikiContainer.setVisibility(GONE);
+            headerViewHolder.nitterContainer.setVisibility(GONE);
+            headerViewHolder.nitterMediaContainer.setVisibility(GONE);
+            headerViewHolder.nitterImage.setVisibility(GONE);
+            headerViewHolder.nitterVideoLabel.setVisibility(GONE);
 
             if (!TextUtils.isEmpty(story.text)) {
                 if (story.spannedText != null) {
@@ -767,6 +780,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         public final LinearLayout nitterContainer;
 
         public final TextView infoHeader;
+        public final LinearLayout linkPreviewLoadingContainer;
         public final LinearLayout emptyView;
         public final TextView emptyViewText;
         public final LoadingIndicator loadingIndicator;
@@ -875,6 +889,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             arxivAbstract = view.findViewById(R.id.comments_header_arxiv_abstract);
             infoContainer = view.findViewById(R.id.comments_header_info_container);
             infoHeader = view.findViewById(R.id.comments_header_info_header);
+            linkPreviewLoadingContainer = view.findViewById(R.id.comments_header_link_preview_loading);
             emptyView = view.findViewById(R.id.comments_header_empty);
             emptyViewText = view.findViewById(R.id.comments_header_empty_text);
             headerView = view.findViewById(R.id.comments_header);

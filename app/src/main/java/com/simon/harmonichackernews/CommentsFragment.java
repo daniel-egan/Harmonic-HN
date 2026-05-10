@@ -1220,6 +1220,13 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             webView.getSettings().setUseWideViewPort(true);
         }
 
+        boolean loadingNitterPreview = story != null
+                && story.nitterInfo == null
+                && shouldLoadNitterLinkPreview(url);
+        if (loadingNitterPreview) {
+            setLinkPreviewLoading(true);
+        }
+
         if (NitterGetter.isConvertibleToNitter(url) && SettingsUtils.shouldRedirectNitter(getContext())) {
             url = NitterGetter.convertToNitterUrl(url);
         }
@@ -1677,82 +1684,97 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     }
 
     private void loadLinkPreviews() {
+        if (story == null || TextUtils.isEmpty(story.url) || story.linkPreviewLoading || story.hasLoadedLinkPreview()) {
+            return;
+        }
+
         if (ArxivAbstractGetter.isValidArxivUrl(story.url) && SettingsUtils.shouldUseLinkPreviewArxiv(getContext())) {
+            setLinkPreviewLoading(true);
             ArxivAbstractGetter.getAbstract(story.url, getContext(), new ArxivAbstractGetter.GetterCallback() {
                 @Override
                 public void onSuccess(ArxivInfo arxivInfo) {
                     story.arxivInfo = arxivInfo;
-                    if (adapter != null) {
-                        adapter.notifyItemChanged(0);
-                    }
+                    setLinkPreviewLoading(false);
                 }
 
                 @Override
                 public void onFailure(String reason) {
-                    // no-op
+                    setLinkPreviewLoading(false);
                 }
             });
         } else if (GitHubInfoGetter.isValidGitHubUrl(story.url) && SettingsUtils.shouldUseLinkPreviewGithub(getContext())) {
+            setLinkPreviewLoading(true);
             GitHubInfoGetter.getInfo(story.url, getContext(), new GitHubInfoGetter.GetterCallback() {
                 @Override
                 public void onSuccess(RepoInfo repoInfo) {
                     story.repoInfo = repoInfo;
-                    if (adapter != null) {
-                        adapter.notifyItemChanged(0);
-                    }
+                    setLinkPreviewLoading(false);
                 }
 
                 @Override
                 public void onFailure(String reason) {
-                    // no op
+                    setLinkPreviewLoading(false);
                 }
             });
         } else if (GitLabInfoGetter.isValidGitLabUrl(story.url) && SettingsUtils.shouldUseLinkPreviewGitLab(getContext())) {
+            setLinkPreviewLoading(true);
             GitLabInfoGetter.getInfo(story.url, getContext(), new GitLabInfoGetter.GetterCallback() {
                 @Override
                 public void onSuccess(GitLabInfo gitLabInfo) {
                     story.gitLabInfo = gitLabInfo;
-                    if (adapter != null) {
-                        adapter.notifyItemChanged(0);
-                    }
+                    setLinkPreviewLoading(false);
                 }
 
                 @Override
                 public void onFailure(String reason) {
-                    // no op
+                    setLinkPreviewLoading(false);
                 }
             });
         } else if (StackExchangeGetter.isValidStackExchangeUrl(story.url) && SettingsUtils.shouldUseLinkPreviewStackExchange(getContext())) {
+            setLinkPreviewLoading(true);
             StackExchangeGetter.getInfo(story.url, getContext(), new StackExchangeGetter.GetterCallback() {
                 @Override
                 public void onSuccess(StackExchangeInfo stackExchangeInfo) {
                     story.stackExchangeInfo = stackExchangeInfo;
-                    if (adapter != null) {
-                        adapter.notifyItemChanged(0);
-                    }
+                    setLinkPreviewLoading(false);
                 }
 
                 @Override
                 public void onFailure(String reason) {
-                    // no op
+                    setLinkPreviewLoading(false);
                 }
             });
         } else if (WikipediaGetter.isValidWikipediaUrl(story.url) && SettingsUtils.shouldUseLinkPreviewWikipedia(getContext())) {
+            setLinkPreviewLoading(true);
             WikipediaGetter.getInfo(story.url, getContext(), new WikipediaGetter.GetterCallback() {
                 @Override
                 public void onSuccess(WikipediaInfo wikipediaInfo) {
                     story.wikiInfo = wikipediaInfo;
-                    if (adapter != null) {
-                        adapter.notifyItemChanged(0);
-                    }
+                    setLinkPreviewLoading(false);
                 }
 
                 @Override
                 public void onFailure(String reason) {
-                    // no op
+                    setLinkPreviewLoading(false);
                 }
             });
         }
+    }
+
+    private void setLinkPreviewLoading(boolean loading) {
+        if (story == null) {
+            return;
+        }
+        story.linkPreviewLoading = loading;
+        if (adapter != null) {
+            adapter.notifyItemChanged(0);
+        }
+    }
+
+    private boolean shouldLoadNitterLinkPreview(String url) {
+        return NitterGetter.isConvertibleToNitter(url)
+                && SettingsUtils.shouldRedirectNitter(getContext())
+                && SettingsUtils.shouldUseLinkPreviewX(getContext());
     }
 
     private void maybeLoadPollOptions() {
@@ -2856,14 +2878,12 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                     @Override
                     public void onSuccess(NitterInfo nitterInfo) {
                         story.nitterInfo = nitterInfo;
-                        if (adapter != null) {
-                            adapter.notifyItemChanged(0);
-                        }
+                        setLinkPreviewLoading(false);
                     }
 
                     @Override
                     public void onFailure(String reason) {
-
+                        setLinkPreviewLoading(false);
                     }
                 });
             }
@@ -2950,6 +2970,9 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         private void showOfflineFallback(WebView view, @Nullable String failingUrl) {
             if (view == null || showingErrorPage || showingCachedArticlePage) {
                 return;
+            }
+            if (story != null && story.linkPreviewLoading && shouldLoadNitterLinkPreview(story.url)) {
+                setLinkPreviewLoading(false);
             }
             if (loadCachedArticleSnapshot(view, failingUrl)) {
                 return;
