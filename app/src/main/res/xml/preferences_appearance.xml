@@ -96,6 +96,14 @@
             app:icon="@drawable/ic_action_visibility"
             app:title="Transparent status bar" />
 
+        <SwitchPreferenceCompat
+            app:singleLineTitle="false"
+            app:key="pref_compact_header"
+            app:defaultValue="false"
+            app:summary="Smaller margins for 'Top stories' header"
+            app:icon="@drawable/ic_action_horizontal_split"
+            app:title="Compact header" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>

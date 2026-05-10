@@ -5,8 +5,31 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/story_container"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:baselineAligned="false">
+
+    <ImageView
+        android:id="@+id/story_preview_image_large"
+        android:layout_width="match_parent"
+        android:layout_height="176dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/story_preview_image_background"
+        android:clipToOutline="true"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        tools:src="@drawable/web_preview"
+        tools:visibility="visible" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
 
     <LinearLayout
         android:id="@+id/story_comment_layout"
@@ -66,7 +89,8 @@
         <LinearLayout
             android:orientation="vertical"
             android:paddingLeft="4dp"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content">
 
             <com.facebook.shimmer.ShimmerFrameLayout
@@ -104,7 +128,7 @@
             <TextView
                 android:id="@+id/story_title"
                 android:layout_width="match_parent"
-                android:text="New algorithm breaks speed limit for solving linear equations"
+                android:text="Algorithm breaks speed limit for solving linear equations"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="2dp"
                 android:textSize="17.5sp"
@@ -131,16 +155,35 @@
 
                 <TextView
                     android:id="@+id/story_meta"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:layout_marginTop="2dp"
                     android:textColor="?attr/textColorDefault"
-                    android:text="53 points • quantamagazine.org • 2 hrs"
+                    android:text="53 points • quantamagazine.org • 2h"
                     android:fontFamily="@font/product_sans"
                     android:textSize="13sp" />
 
             </LinearLayout>
         </LinearLayout>
+
+        <ImageView
+            android:id="@+id/story_preview_image_small"
+            android:layout_width="72dp"
+            android:layout_height="54dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/story_preview_image_background"
+            android:clipToOutline="true"
+            android:contentDescription="@null"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            tools:src="@drawable/web_preview"
+            tools:visibility="visible" />
+    </LinearLayout>
+
     </LinearLayout>
 
 </LinearLayout>

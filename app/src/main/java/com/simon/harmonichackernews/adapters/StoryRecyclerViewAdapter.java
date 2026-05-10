@@ -3,6 +3,7 @@ package com.simon.harmonichackernews.adapters;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -26,7 +27,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.data.Story;
 import com.simon.harmonichackernews.network.FaviconLoader;
+import com.simon.harmonichackernews.network.StoryPreviewImageLoader;
 import com.simon.harmonichackernews.utils.FontUtils;
+import com.simon.harmonichackernews.utils.SettingsUtils;
 import com.simon.harmonichackernews.utils.ThemeUtils;
 import com.simon.harmonichackernews.utils.Utils;
 import com.simon.harmonichackernews.utils.ViewUtils;
@@ -36,6 +39,10 @@ import org.sufficientlysecure.htmltextview.HtmlTextView;
 import org.sufficientlysecure.htmltextview.OnClickATagListener;
 
 import java.util.List;
+
+import coil.Coil;
+import coil.request.ImageRequest;
+import coil.target.Target;
 
 public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -61,6 +68,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     public boolean showCommentsCount;
     public boolean compactView;
     public boolean thumbnails;
+    public String previewImageMode;
     public boolean showIndex;
     public boolean compactHeader;
     public boolean leftAlign;
@@ -80,6 +88,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                                     boolean shouldShowCommentsCount,
                                     boolean shouldUseCompactView,
                                     boolean shouldShowThumbnails,
+                                    String preferredPreviewImageMode,
                                     boolean shouldShowIndex,
                                     boolean shouldUseCompactHeader,
                                     boolean shouldLeftAlign,
@@ -93,6 +102,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
         showCommentsCount = shouldShowCommentsCount;
         compactView = shouldUseCompactView;
         thumbnails = shouldShowThumbnails;
+        previewImageMode = preferredPreviewImageMode;
         showIndex = shouldShowIndex;
         compactHeader = shouldUseCompactHeader;
         leftAlign = shouldLeftAlign;
@@ -139,6 +149,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
 
             storyViewHolder.story = stories.get(position);
             boolean useClickedEffects = storyViewHolder.story.clicked && !disableClickedEffects;
+            resetPreviewImages(storyViewHolder);
 
             if (showIndex) {
                 int displayIndex = position + 1;
@@ -210,6 +221,8 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                 if (thumbnails) {
                     FaviconLoader.loadFavicon(storyViewHolder.story.url, storyViewHolder.metaFavicon, ctx, faviconProvider);
                 }
+
+                bindPreviewImage(storyViewHolder, storyViewHolder.story);
 
                 storyViewHolder.commentsIcon.setImageResource(hotness > 0 && storyViewHolder.story.score + storyViewHolder.story.descendants > hotness ? R.drawable.ic_action_whatshot : R.drawable.ic_action_comment);
 
@@ -287,6 +300,111 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
         }
     }
 
+    private void bindPreviewImage(final StoryViewHolder storyViewHolder, final Story story) {
+        if (SettingsUtils.STORY_PREVIEW_IMAGE_OFF.equals(previewImageMode)
+                || story.loadingFailed
+                || story.isComment
+                || TextUtils.isEmpty(story.url)
+                || story.previewImageLoadFailed) {
+            return;
+        }
+
+        if (!TextUtils.isEmpty(story.previewImageUrl)) {
+            loadPreviewImage(storyViewHolder, story);
+            return;
+        }
+
+        if (story.previewImageUrlLoaded || story.previewImageUrlLoading) {
+            return;
+        }
+
+        story.previewImageUrlLoading = true;
+        StoryPreviewImageLoader.loadPreviewImageUrl(story.url, imageUrl -> {
+            story.previewImageUrlLoading = false;
+            story.previewImageUrlLoaded = true;
+            if (TextUtils.isEmpty(imageUrl)) {
+                return;
+            }
+
+            story.previewImageUrl = imageUrl;
+            story.previewImageLoadFailed = false;
+            int index = stories.indexOf(story);
+            if (index >= 0 && !SettingsUtils.STORY_PREVIEW_IMAGE_OFF.equals(previewImageMode)) {
+                notifyItemChanged(index);
+            }
+        });
+    }
+
+    private void loadPreviewImage(final StoryViewHolder storyViewHolder, final Story story) {
+        final ImageView previewImage = SettingsUtils.STORY_PREVIEW_IMAGE_LARGE.equals(previewImageMode)
+                ? storyViewHolder.largePreviewImage
+                : storyViewHolder.smallPreviewImage;
+        final String imageUrl = story.previewImageUrl;
+        if (previewImage == null) {
+            return;
+        }
+
+        previewImage.setTag(imageUrl);
+
+        int previewWidth = SettingsUtils.STORY_PREVIEW_IMAGE_LARGE.equals(previewImageMode)
+                ? previewImage.getResources().getDisplayMetrics().widthPixels
+                : Utils.pxFromDpInt(previewImage.getResources(), 72);
+        int previewHeight = SettingsUtils.STORY_PREVIEW_IMAGE_LARGE.equals(previewImageMode)
+                ? Utils.pxFromDpInt(previewImage.getResources(), 176)
+                : Utils.pxFromDpInt(previewImage.getResources(), 54);
+        ImageRequest request = new ImageRequest.Builder(previewImage.getContext())
+                .data(imageUrl)
+                .size(previewWidth, previewHeight)
+                .target(new Target() {
+                    @Override
+                    public void onStart(Drawable placeholder) {
+                        if (isCurrentPreviewTarget(previewImage, imageUrl)) {
+                            previewImage.setImageDrawable(null);
+                            previewImage.setVisibility(View.GONE);
+                        }
+                    }
+
+                    @Override
+                    public void onError(Drawable error) {
+                        if (isCurrentPreviewTarget(previewImage, imageUrl)) {
+                            story.previewImageLoadFailed = true;
+                            previewImage.setImageDrawable(null);
+                            previewImage.setVisibility(View.GONE);
+                        }
+                    }
+
+                    @Override
+                    public void onSuccess(Drawable result) {
+                        if (isCurrentPreviewTarget(previewImage, imageUrl)) {
+                            previewImage.setImageDrawable(result);
+                            previewImage.setVisibility(View.VISIBLE);
+                        }
+                    }
+                })
+                .build();
+
+        Coil.imageLoader(previewImage.getContext()).enqueue(request);
+    }
+
+    private static void resetPreviewImages(StoryViewHolder storyViewHolder) {
+        resetPreviewImage(storyViewHolder.smallPreviewImage);
+        resetPreviewImage(storyViewHolder.largePreviewImage);
+    }
+
+    private static void resetPreviewImage(ImageView previewImage) {
+        if (previewImage == null) {
+            return;
+        }
+
+        previewImage.setTag(null);
+        previewImage.setImageDrawable(null);
+        previewImage.setVisibility(View.GONE);
+    }
+
+    private static boolean isCurrentPreviewTarget(ImageView previewImage, String imageUrl) {
+        return imageUrl.equals(previewImage.getTag());
+    }
+
     @Override
     public int getItemViewType(int position) {
         if (atSubmissions) {
@@ -339,6 +457,8 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
         public final View metaShimmer;
         public final LinearLayout metaContainer;
         public final ImageView metaFavicon;
+        public final ImageView smallPreviewImage;
+        public final ImageView largePreviewImage;
         public final TextView indexTextView;
 
         private int touchX, touchY;
@@ -359,11 +479,16 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             titleShimmer = view.findViewById(R.id.story_title_shimmer);
             metaShimmer = view.findViewById(R.id.story_title_shimmer_meta);
             metaFavicon = view.findViewById(R.id.story_meta_favicon);
+            smallPreviewImage = view.findViewById(R.id.story_preview_image_small);
+            largePreviewImage = view.findViewById(R.id.story_preview_image_large);
             indexTextView = view.findViewById(R.id.story_index);
             ViewCompat.setAccessibilityHeading(titleView, true);
 
             linkLayoutView.setOnClickListener(v -> linkClickListener.onItemClick(getAbsoluteAdapterPosition()));
             commentLayoutView.setOnClickListener(v -> commentClickListener.onItemClick(getAbsoluteAdapterPosition()));
+            if (largePreviewImage != null) {
+                largePreviewImage.setOnClickListener(v -> linkClickListener.onItemClick(getAbsoluteAdapterPosition()));
+            }
 
             if (longClickListener != null) {
                 linkLayoutView.setOnTouchListener(new View.OnTouchListener() {
@@ -376,6 +501,17 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                 });
 
                 linkLayoutView.setOnLongClickListener(v -> longClickListener.onLongClick(v, getAbsoluteAdapterPosition(), touchX, touchY));
+                if (largePreviewImage != null) {
+                    largePreviewImage.setOnTouchListener(new View.OnTouchListener() {
+                        @Override
+                        public boolean onTouch(View v, MotionEvent event) {
+                            touchX = (int) event.getX();
+                            touchY = (int) event.getY();
+                            return false;
+                        }
+                    });
+                    largePreviewImage.setOnLongClickListener(v -> longClickListener.onLongClick(v, getAbsoluteAdapterPosition(), touchX, touchY));
+                }
             }
         }
     }

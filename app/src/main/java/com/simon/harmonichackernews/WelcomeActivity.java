@@ -28,7 +28,6 @@ import com.simon.harmonichackernews.utils.ThemeUtils;
 public class WelcomeActivity extends AppCompatActivity {
 
     private static final long PREVIEW_ANIMATION_DURATION_MS = 180;
-    private static final long PREVIEW_TEXT_FADE_DURATION_MS = 90;
 
     @SuppressLint("SetTextI18n")
     @Override
@@ -63,11 +62,8 @@ public class WelcomeActivity extends AppCompatActivity {
 
         ImageView favicon = binding.storyListItem.storyMetaFavicon;
         favicon.setImageResource(R.drawable.quanta);
-        TextView storyMetaPoints = binding.storyListItem.storyMetaPoints;
         TextView storyMeta = binding.storyListItem.storyMeta;
-        storyMeta.setText("quantamagazine.org • 2 hrs");
-        storyMetaPoints.setVisibility(View.VISIBLE);
-        storyMetaPoints.setAlpha(1f);
+        storyMeta.setText("53 points \u2022 quantamagazine.org \u2022 2h");
         binding.storyListItem.storyIndex.setVisibility(View.VISIBLE);
 
         binding.welcomeSwitchThumbnails.setOnCheckedChangeListener((@NonNull CompoundButton compoundButton, boolean b) -> {
@@ -118,22 +114,10 @@ public class WelcomeActivity extends AppCompatActivity {
 
     @SuppressLint("SetTextI18n")
     private void animateStoryMeta(ActivityWelcomeBinding binding, boolean showPoints) {
-        TextView storyMetaPoints = binding.storyListItem.storyMetaPoints;
-        storyMetaPoints.animate().cancel();
-        if (showPoints) {
-            storyMetaPoints.setAlpha(0f);
-            beginPreviewTransition(binding);
-            storyMetaPoints.setVisibility(View.VISIBLE);
-            storyMetaPoints.animate()
-                    .alpha(1f)
-                    .setDuration(PREVIEW_TEXT_FADE_DURATION_MS)
-                    .setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f))
-                    .start();
-            return;
-        }
-
-        beginPreviewTransition(binding);
-        storyMetaPoints.setVisibility(View.GONE);
+        TextView storyMeta = binding.storyListItem.storyMeta;
+        storyMeta.animate().cancel();
+        storyMeta.setAlpha(1f);
+        storyMeta.setText(showPoints ? "53 points \u2022 quantamagazine.org \u2022 2h" : "quantamagazine.org \u2022 2h");
     }
 
     @SuppressLint("ApplySharedPref")

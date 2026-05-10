@@ -5,6 +5,7 @@ public class Changelog {
     static public String getHTML() {
         return  "<b>Version 2.4.1:</b><br>" +
                 "- Added support for HN Favorites. You can convert all your bookmarks to favorites in Settings -> Data -> Bookmarks and also disable bookmarks from there.<br>" +
+                "- Added optional story preview images" +
                 "- Added ability to bookmark comments<br>" +
                 "- Added new story display style: Card<br>" +
                 "- Updated many parts of settings with previews<br>" +

@@ -5,7 +5,6 @@ import android.content.ComponentName;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
-
 import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.utils.SettingsUtils;
 import com.simon.harmonichackernews.widget.StoriesRemoteViewsFactory;
@@ -43,6 +42,13 @@ public class StoriesPreferenceFragment extends BaseSettingsFragment {
             changePrefStatus(findPreference("pref_show_comments_count"), !(boolean) newValue);
             changePrefStatus(findPreference("pref_thumbnails"), !(boolean) newValue);
             changePrefStatus(findPreference("pref_favicon_provider"), !(boolean) newValue && SettingsUtils.shouldShowThumbnails(getContext()));
+            return true;
+        });
+
+        findPreference("pref_story_preview_image_mode").setOnPreferenceChangeListener((preference, newValue) -> {
+            if (previewPreference != null) {
+                previewPreference.updatePreviewImageMode((String) newValue);
+            }
             return true;
         });
 

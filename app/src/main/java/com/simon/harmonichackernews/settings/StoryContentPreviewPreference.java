@@ -4,12 +4,14 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.transition.AutoTransition;
+import android.transition.ChangeBounds;
 import android.transition.TransitionManager;
 import android.transition.TransitionSet;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.animation.PathInterpolator;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -17,6 +19,7 @@ import android.widget.TextView;
 import androidx.core.view.ViewCompat;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceViewHolder;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.utils.SettingsUtils;
@@ -33,8 +36,10 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
     private View commentLayout;
     private ImageView favicon;
     private ImageView commentsIcon;
+    private ImageView smallPreviewImage;
+    private ImageView largePreviewImage;
+    private TextView storyTitle;
     private TextView storyIndex;
-    private TextView storyMetaPoints;
     private TextView storyMeta;
     private TextView comments;
     private boolean leftAligned;
@@ -71,31 +76,35 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
     }
 
     public void updateThumbnails(boolean showThumbnails) {
-        updatePreview(showThumbnails, null, null, null, null, null, null, true);
+        updatePreview(showThumbnails, null, null, null, null, null, null, null, true);
     }
 
     public void updatePoints(boolean showPoints) {
-        updatePreview(null, showPoints, null, null, null, null, null, true);
+        updatePreview(null, showPoints, null, null, null, null, null, null, true);
     }
 
     public void updateCommentsCount(boolean showCommentsCount) {
-        updatePreview(null, null, showCommentsCount, null, null, null, null, true);
+        updatePreview(null, null, showCommentsCount, null, null, null, null, null, true);
     }
 
     public void updateShowIndex(boolean showIndex) {
-        updatePreview(null, null, null, showIndex, null, null, null, true);
+        updatePreview(null, null, null, showIndex, null, null, null, null, true);
     }
 
     public void updateLeftAlign(boolean leftAlign) {
-        updatePreview(null, null, null, null, leftAlign, null, null, true);
+        updatePreview(null, null, null, null, leftAlign, null, null, null, true);
     }
 
     public void updateCompact(boolean compact) {
-        updatePreview(null, null, null, null, null, compact, null, true);
+        updatePreview(null, null, null, null, null, compact, null, null, true);
     }
 
     public void updateHotness(String hotnessValue) {
-        updatePreview(null, null, null, null, null, null, parseHotness(hotnessValue), true);
+        updatePreview(null, null, null, null, null, null, parseHotness(hotnessValue), null, true);
+    }
+
+    public void updatePreviewImageMode(String previewImageMode) {
+        updatePreview(null, null, null, null, null, null, null, previewImageMode, true);
     }
 
     @Override
@@ -124,6 +133,7 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
                 || "pref_show_index".equals(key)
                 || "pref_left_align".equals(key)
                 || "pref_hotness".equals(key)
+                || SettingsUtils.PREF_STORY_PREVIEW_IMAGE_MODE.equals(key)
                 || "pref_compact_view".equals(key)) {
             updatePreview(true);
         }
@@ -146,8 +156,10 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         metaContainer = itemView.findViewById(R.id.story_meta_container);
         favicon = itemView.findViewById(R.id.story_meta_favicon);
         commentsIcon = itemView.findViewById(R.id.story_comments_icon);
+        smallPreviewImage = itemView.findViewById(R.id.story_preview_image_small);
+        largePreviewImage = itemView.findViewById(R.id.story_preview_image_large);
+        storyTitle = itemView.findViewById(R.id.story_title);
         storyIndex = itemView.findViewById(R.id.story_index);
-        storyMetaPoints = itemView.findViewById(R.id.story_meta_points);
         storyMeta = itemView.findViewById(R.id.story_meta);
         comments = itemView.findViewById(R.id.story_comments);
 
@@ -175,17 +187,22 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
             commentsIcon.setScaleX(1f);
             commentsIcon.setScaleY(1f);
         }
+        if (smallPreviewImage != null) {
+            smallPreviewImage.setImageResource(R.drawable.web_preview);
+        }
+        if (largePreviewImage != null) {
+            largePreviewImage.setImageResource(R.drawable.web_preview);
+        }
+        if (storyTitle != null) {
+            storyTitle.setText("Algorithm breaks speed limit for solving linear equations");
+        }
         if (storyIndex != null) {
             storyIndex.setText("3.");
             storyIndex.setContentDescription("Story 3");
             storyIndex.setVisibility(View.GONE);
         }
-        if (storyMetaPoints != null) {
-            storyMetaPoints.setText("53 points \u2022 ");
-            storyMetaPoints.setVisibility(View.VISIBLE);
-        }
         if (storyMeta != null) {
-            storyMeta.setText("quantamagazine.org \u2022 2 hrs");
+            storyMeta.setText("53 points \u2022 quantamagazine.org \u2022 2h");
         }
         if (comments != null) {
             comments.setText("18");
@@ -194,7 +211,7 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
     }
 
     private void updatePreview(boolean animate) {
-        updatePreview(null, null, null, null, null, null, null, animate);
+        updatePreview(null, null, null, null, null, null, null, null, animate);
     }
 
     private void updatePreview(
@@ -205,6 +222,7 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
             Boolean leftAlignOverride,
             Boolean compactOverride,
             Integer hotnessOverride,
+            String previewImageModeOverride,
             boolean animate) {
         if (previewRoot == null) {
             return;
@@ -231,6 +249,9 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         int hotness = hotnessOverride != null
                 ? hotnessOverride
                 : SettingsUtils.getPreferredHotness(getContext());
+        String previewImageMode = previewImageModeOverride != null
+                ? previewImageModeOverride
+                : SettingsUtils.getPreferredStoryPreviewImageMode(getContext());
         if (animate) {
             beginPreviewTransition();
         }
@@ -248,6 +269,7 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         }
 
         updateStoryIndex(showIndex);
+        updatePreviewImage(previewImageMode);
         updatePoints(showPoints, animate);
         updateCommentCount(showCommentsCount, compact, animate);
         updateHotnessIcon(hotness, animate);
@@ -258,41 +280,48 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
             return;
         }
 
+        ViewGroup settingsList = findAncestorOfType(previewRoot, RecyclerView.class);
+        if (settingsList != null && ViewCompat.isLaidOut(settingsList)) {
+            TransitionManager.beginDelayedTransition(settingsList, createSettingsListTransition());
+        }
+        TransitionManager.beginDelayedTransition(previewRoot, createPreviewTransition());
+    }
+
+    private ChangeBounds createSettingsListTransition() {
+        ChangeBounds transition = new ChangeBounds();
+        transition.setDuration(PREVIEW_ANIMATION_DURATION_MS);
+        transition.setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f));
+        transition.excludeChildren(previewRoot, true);
+        return transition;
+    }
+
+    private AutoTransition createPreviewTransition() {
         AutoTransition transition = new AutoTransition();
         transition.setOrdering(TransitionSet.ORDERING_TOGETHER);
         transition.setDuration(PREVIEW_ANIMATION_DURATION_MS);
         transition.setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f));
-        TransitionManager.beginDelayedTransition(previewRoot, transition);
+        return transition;
     }
 
-    private void updatePoints(boolean showPoints, boolean animate) {
-        if (storyMetaPoints == null) {
-            if (storyMeta != null) {
-                storyMeta.setText(showPoints ? "53 points \u2022 quantamagazine.org \u2022 2 hrs" : "quantamagazine.org \u2022 2 hrs");
+    private <T extends ViewGroup> T findAncestorOfType(View view, Class<T> type) {
+        ViewParent parent = view.getParent();
+        while (parent != null) {
+            if (type.isInstance(parent)) {
+                return type.cast(parent);
             }
+            parent = parent.getParent();
+        }
+        return null;
+    }
+
+    private void updatePoints(boolean showPoints, boolean animateIgnored) {
+        if (storyMeta == null) {
             return;
         }
 
-        storyMetaPoints.animate().cancel();
-        int targetVisibility = showPoints ? View.VISIBLE : View.GONE;
-        if (!animate) {
-            storyMetaPoints.setVisibility(targetVisibility);
-            storyMetaPoints.setAlpha(1f);
-            return;
-        }
-
-        if (showPoints && storyMetaPoints.getVisibility() != View.VISIBLE) {
-            storyMetaPoints.setAlpha(0f);
-            storyMetaPoints.setVisibility(View.VISIBLE);
-            storyMetaPoints.animate()
-                    .alpha(1f)
-                    .setDuration(PREVIEW_TEXT_FADE_DURATION_MS)
-                    .setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f))
-                    .start();
-        } else {
-            storyMetaPoints.setVisibility(targetVisibility);
-            storyMetaPoints.setAlpha(1f);
-        }
+        storyMeta.animate().cancel();
+        storyMeta.setAlpha(1f);
+        storyMeta.setText(showPoints ? "53 points \u2022 quantamagazine.org \u2022 2h" : "quantamagazine.org \u2022 2h");
     }
 
     private void updateStoryIndex(boolean showIndex) {
@@ -301,6 +330,17 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         }
 
         storyIndex.setVisibility(showIndex ? View.VISIBLE : View.GONE);
+    }
+
+    private void updatePreviewImage(String previewImageMode) {
+        boolean showSmallPreview = SettingsUtils.STORY_PREVIEW_IMAGE_SMALL.equals(previewImageMode);
+        boolean showLargePreview = SettingsUtils.STORY_PREVIEW_IMAGE_LARGE.equals(previewImageMode);
+        if (smallPreviewImage != null) {
+            smallPreviewImage.setVisibility(showSmallPreview ? View.VISIBLE : View.GONE);
+        }
+        if (largePreviewImage != null) {
+            largePreviewImage.setVisibility(showLargePreview ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void updateCommentCount(boolean showCommentsCount, boolean compact, boolean animate) {

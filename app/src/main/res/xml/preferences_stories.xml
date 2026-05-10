@@ -5,6 +5,14 @@
         app:title="Layout"
         android:layout="@layout/preference_category">
 
+        <com.simon.harmonichackernews.settings.StoryContentPreviewPreference
+            app:key="pref_story_content_preview" />
+
+        <com.simon.harmonichackernews.settings.StoryPreviewImagePreference
+            app:defaultValue="off"
+            app:key="pref_story_preview_image_mode"
+            app:title="Preview image" />
+
         <SwitchPreferenceCompat
             app:singleLineTitle="false"
             app:key="pref_compact_view"
@@ -14,37 +22,10 @@
 
         <SwitchPreferenceCompat
             app:singleLineTitle="false"
-            app:key="pref_compact_header"
-            app:defaultValue="false"
-            app:summary="Smaller margins for 'Top stories' header"
-            app:icon="@drawable/ic_action_horizontal_split"
-            app:title="Compact header" />
-
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        app:title="Content"
-        android:layout="@layout/preference_category">
-
-        <com.simon.harmonichackernews.settings.StoryContentPreviewPreference
-            app:key="pref_story_content_preview" />
-
-        <SwitchPreferenceCompat
-            app:singleLineTitle="false"
             app:defaultValue="true"
             app:key="pref_thumbnails"
             app:icon="@drawable/ic_action_web"
             app:title="Show story thumbnails" />
-
-        <ListPreference
-            app:singleLineTitle="false"
-            app:icon="@drawable/ic_action_web"
-            app:title="Favicon provider"
-            app:key="pref_favicon_provider"
-            app:useSimpleSummaryProvider="true"
-            app:entries="@array/favicon_providers"
-            app:defaultValue="Google"
-            app:entryValues="@array/favicon_providers" />
 
         <SwitchPreferenceCompat
             app:singleLineTitle="false"
@@ -140,6 +121,16 @@
             app:icon="@drawable/ic_action_hide"
             app:summary="Applies on refresh"
             app:title="Hide clicked posts" />
+
+        <ListPreference
+            app:singleLineTitle="false"
+            app:icon="@drawable/ic_action_web"
+            app:title="Favicon provider"
+            app:key="pref_favicon_provider"
+            app:useSimpleSummaryProvider="true"
+            app:entries="@array/favicon_providers"
+            app:defaultValue="Google"
+            app:entryValues="@array/favicon_providers" />
 
     </PreferenceCategory>
 

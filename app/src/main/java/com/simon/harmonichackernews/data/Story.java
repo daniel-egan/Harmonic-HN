@@ -18,6 +18,10 @@ public class Story {
     public String title;
     public String pdfTitle;
     public String url;
+    public transient String previewImageUrl;
+    public transient boolean previewImageUrlLoaded;
+    public transient boolean previewImageUrlLoading;
+    public transient boolean previewImageLoadFailed;
     public int[] kids;
     public int[] pollOptions;
     public ArrayList<PollOption> pollOptionArrayList;

@@ -18,10 +18,14 @@ public class SettingsUtils {
     public static final String PREF_COMMENT_DEPTH_INDICATORS = "pref_comment_depth_indicators";
     public static final String PREF_MONOCHROME_COMMENT_DEPTH = "pref_monochrome_comment_depth";
     public static final String PREF_STORY_DISPLAY_STYLE = "pref_story_display_style";
+    public static final String PREF_STORY_PREVIEW_IMAGE_MODE = "pref_story_preview_image_mode";
     public static final String PREF_COMMENT_DISPLAY_STYLE = "pref_comment_display_style";
     public static final String PREF_BOOKMARKS_ENABLED = "pref_bookmarks_enabled";
     public static final String STORY_DISPLAY_STYLE_STANDARD = "standard";
     public static final String STORY_DISPLAY_STYLE_CARD = "card";
+    public static final String STORY_PREVIEW_IMAGE_OFF = "off";
+    public static final String STORY_PREVIEW_IMAGE_SMALL = "small";
+    public static final String STORY_PREVIEW_IMAGE_LARGE = "large";
     public static final String COMMENT_DISPLAY_STYLE_STANDARD = STORY_DISPLAY_STYLE_STANDARD;
     public static final String COMMENT_DISPLAY_STYLE_CARD = STORY_DISPLAY_STYLE_CARD;
     public static final String FAVORITES_LABEL = "Favorites";
@@ -99,6 +103,15 @@ public class SettingsUtils {
 
     public static boolean shouldShowThumbnails(Context ctx) {
         return getBooleanPref("pref_thumbnails", true, ctx);
+    }
+
+    public static String getPreferredStoryPreviewImageMode(Context ctx) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        String mode = prefs.getString(PREF_STORY_PREVIEW_IMAGE_MODE, null);
+        if (STORY_PREVIEW_IMAGE_SMALL.equals(mode) || STORY_PREVIEW_IMAGE_LARGE.equals(mode)) {
+            return mode;
+        }
+        return STORY_PREVIEW_IMAGE_OFF;
     }
 
     public static boolean shouldCollapseParent(Context ctx) {
