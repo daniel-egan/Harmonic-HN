@@ -21,6 +21,8 @@ public class SettingsUtils {
     public static final String PREF_STORY_PREVIEW_IMAGE_MODE = "pref_story_preview_image_mode";
     public static final String PREF_COMMENT_DISPLAY_STYLE = "pref_comment_display_style";
     public static final String PREF_BOOKMARKS_ENABLED = "pref_bookmarks_enabled";
+    public static final String PREF_GRAY_OUT_CLICKED = "pref_gray_out_clicked";
+    public static final String PREF_HIDE_CLICKED = "pref_hide_clicked";
     public static final String STORY_DISPLAY_STYLE_STANDARD = "standard";
     public static final String STORY_DISPLAY_STYLE_CARD = "card";
     public static final String STORY_PREVIEW_IMAGE_OFF = "off";
@@ -270,7 +272,11 @@ public class SettingsUtils {
     }
 
     public static boolean shouldHideClicked(Context ctx) {
-        return getBooleanPref("pref_hide_clicked", false, ctx);
+        return getBooleanPref(PREF_HIDE_CLICKED, false, ctx);
+    }
+
+    public static boolean shouldGrayOutClicked(Context ctx) {
+        return getBooleanPref(PREF_GRAY_OUT_CLICKED, true, ctx);
     }
 
     public static boolean shouldUseLinkPreviewArxiv(Context ctx) {

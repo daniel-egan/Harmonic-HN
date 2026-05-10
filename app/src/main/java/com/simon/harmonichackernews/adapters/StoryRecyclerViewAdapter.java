@@ -78,6 +78,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
     public int type;
     public boolean allowCommentRows;
     public boolean disableClickedEffects;
+    public boolean grayOutClicked;
 
     public boolean paginationMode = false;
     public static final int PAGINATION_PAGE_SIZE = 30;
@@ -93,6 +94,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
                                     boolean shouldUseCompactHeader,
                                     boolean shouldLeftAlign,
                                     boolean shouldUseCardStyle,
+                                    boolean shouldGrayOutClicked,
                                     int preferredHotness,
                                     String faviconProv,
                                     String submissionsUserName,
@@ -107,6 +109,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
         compactHeader = shouldUseCompactHeader;
         leftAlign = shouldLeftAlign;
         cardStyle = shouldUseCardStyle;
+        grayOutClicked = shouldGrayOutClicked;
         hotness = preferredHotness;
         faviconProvider = faviconProv;
         type = wantedType;
@@ -148,7 +151,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             final Context ctx = storyViewHolder.itemView.getContext();
 
             storyViewHolder.story = stories.get(position);
-            boolean useClickedEffects = storyViewHolder.story.clicked && !disableClickedEffects;
+            boolean useClickedEffects = storyViewHolder.story.clicked && grayOutClicked && !disableClickedEffects;
             resetPreviewImages(storyViewHolder);
 
             if (showIndex) {

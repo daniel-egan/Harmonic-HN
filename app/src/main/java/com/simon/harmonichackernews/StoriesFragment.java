@@ -1127,6 +1127,7 @@ public class StoriesFragment extends Fragment {
                 SettingsUtils.shouldUseCompactHeader(getContext()),
                 SettingsUtils.shouldUseLeftAlign(getContext()),
                 SettingsUtils.shouldUseCardStoryDisplayStyle(getContext()),
+                SettingsUtils.shouldGrayOutClicked(getContext()),
                 SettingsUtils.getPreferredHotness(getContext()),
                 SettingsUtils.getPreferredFaviconProvider(getContext()),
                 null,
@@ -1405,6 +1406,11 @@ public class StoriesFragment extends Fragment {
             adapter.cardStyle = !adapter.cardStyle;
             setupAdapter();
             recyclerView.setAdapter(adapter);
+        }
+
+        if (adapter.grayOutClicked != SettingsUtils.shouldGrayOutClicked(getContext())) {
+            adapter.grayOutClicked = SettingsUtils.shouldGrayOutClicked(getContext());
+            adapter.notifyItemRangeChanged(0, adapter.getItemCount());
         }
 
         boolean newPaginationMode = SettingsUtils.shouldUsePaginationMode(getContext());

@@ -110,5 +110,13 @@ public class StoriesPreferenceFragment extends BaseSettingsFragment {
             }
             return true;
         });
+
+        findPreference(SettingsUtils.PREF_HIDE_CLICKED).setOnPreferenceChangeListener((preference, newValue) -> {
+            SettingsCallback callback = getSettingsCallback();
+            if (callback != null) {
+                callback.onRequestRestart();
+            }
+            return true;
+        });
     }
 }
