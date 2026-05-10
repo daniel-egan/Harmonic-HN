@@ -97,6 +97,9 @@ public class Utils {
     public final static String KEY_SHARED_PREFERENCES_FIRST_TIME = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_FIRST_TIME";
     public final static String KEY_SHARED_PREFERENCES_LAST_VERSION = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_LAST_VERSION";
     public final static String KEY_SHARED_PREFERENCES_FAVORITES = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_FAVORITES";
+    public final static String KEY_SHARED_PREFERENCES_FAVORITE_COMMENTS = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_FAVORITE_COMMENTS";
+    public final static String KEY_SHARED_PREFERENCES_UPVOTED = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_UPVOTED";
+    public final static String KEY_SHARED_PREFERENCES_UPVOTED_COMMENTS = "com.simon.harmonichackernews.KEY_SHARED_PREFERENCES_UPVOTED_COMMENTS";
 
     public final static String KEY_NIGHTTIME_FROM_HOUR = "com.simon.harmonichackernews.KEY_NIGHTTIME_FROM_HOUR";
     public final static String KEY_NIGHTTIME_FROM_MINUTE = "com.simon.harmonichackernews.KEY_NIGHTTIME_FROM_MINUTE";
@@ -543,11 +546,27 @@ public class Utils {
     }
 
     public static ArrayList<Bookmark> loadFavorites(Context ctx, boolean sorted) {
-        ArrayList<Bookmark> favorites = loadBookmarks(false, SettingsUtils.readStringFromSharedPreferences(ctx, KEY_SHARED_PREFERENCES_FAVORITES));
+        return loadSavedItemList(ctx, KEY_SHARED_PREFERENCES_FAVORITES, sorted);
+    }
+
+    public static ArrayList<Bookmark> loadUpvoted(Context ctx, boolean sorted) {
+        return loadSavedItemList(ctx, KEY_SHARED_PREFERENCES_UPVOTED, sorted);
+    }
+
+    public static Set<Integer> loadFavoriteCommentIds(Context ctx) {
+        return SettingsUtils.readIntSetFromSharedPreferences(ctx, KEY_SHARED_PREFERENCES_FAVORITE_COMMENTS);
+    }
+
+    public static Set<Integer> loadUpvotedCommentIds(Context ctx) {
+        return SettingsUtils.readIntSetFromSharedPreferences(ctx, KEY_SHARED_PREFERENCES_UPVOTED_COMMENTS);
+    }
+
+    private static ArrayList<Bookmark> loadSavedItemList(Context ctx, String key, boolean sorted) {
+        ArrayList<Bookmark> items = loadBookmarks(false, SettingsUtils.readStringFromSharedPreferences(ctx, key));
         if (sorted) {
-            Collections.sort(favorites, (b1, b2) -> Integer.compare(b2.id, b1.id));
+            Collections.sort(items, (b1, b2) -> Integer.compare(b2.id, b1.id));
         }
-        return favorites;
+        return items;
     }
 
     public static boolean isFavorited(Context ctx, int id) {
@@ -566,7 +585,23 @@ public class Utils {
     }
 
     public static void saveFavoriteIds(Context ctx, List<Integer> ids) {
-        ArrayList<Bookmark> favorites = new ArrayList<>();
+        saveSavedItemIds(ctx, KEY_SHARED_PREFERENCES_FAVORITES, ids);
+    }
+
+    public static void saveFavoriteCommentIds(Context ctx, Set<Integer> ids) {
+        SettingsUtils.saveIntSetToSharedPreferences(ctx, KEY_SHARED_PREFERENCES_FAVORITE_COMMENTS, ids);
+    }
+
+    public static void saveUpvotedIds(Context ctx, List<Integer> ids) {
+        saveSavedItemIds(ctx, KEY_SHARED_PREFERENCES_UPVOTED, ids);
+    }
+
+    public static void saveUpvotedCommentIds(Context ctx, Set<Integer> ids) {
+        SettingsUtils.saveIntSetToSharedPreferences(ctx, KEY_SHARED_PREFERENCES_UPVOTED_COMMENTS, ids);
+    }
+
+    private static void saveSavedItemIds(Context ctx, String key, List<Integer> ids) {
+        ArrayList<Bookmark> items = new ArrayList<>();
         Set<Integer> seenIds = new HashSet<>();
         long now = System.currentTimeMillis();
 
@@ -575,13 +610,13 @@ public class Utils {
                 continue;
             }
 
-            Bookmark favorite = new Bookmark();
-            favorite.id = id;
-            favorite.created = now - favorites.size();
-            favorites.add(favorite);
+            Bookmark item = new Bookmark();
+            item.id = id;
+            item.created = now - items.size();
+            items.add(item);
         }
 
-        saveFavorites(ctx, favorites);
+        saveBookmarkList(ctx, key, items);
     }
 
     public static void addFavorite(Context ctx, int id) {

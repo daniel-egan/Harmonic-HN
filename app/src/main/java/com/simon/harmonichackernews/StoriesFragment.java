@@ -47,6 +47,7 @@ import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.StringRequest;
 import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.search.SearchBar;
@@ -109,6 +110,7 @@ public class StoriesFragment extends Fragment {
     private ImageButton searchButton;
     private ImageButton closeSearchButton;
     private ImageButton moreButton;
+    private MaterialButtonToggleGroup userItemFilterGroup;
     private RelativeLayout loadingIndicator;
     private LinearLayout loadingFailedLayout;
     private TextView loadingFailedText;
@@ -124,6 +126,8 @@ public class StoriesFragment extends Fragment {
     private StoryRecyclerViewAdapter adapter;
     private ArrayAdapter<CharSequence> typeSpinnerAdapter;
     private List<Story> stories;
+    private final ArrayList<Story> userItemListStories = new ArrayList<>();
+    private Set<Integer> userItemListCommentIds = new HashSet<>();
     private RequestQueue queue;
     private final Object requestTag = new Object();
     private LinearLayoutManager linearLayoutManager;
@@ -175,6 +179,9 @@ public class StoriesFragment extends Fragment {
     private static final int[] SEARCH_MINIMUM_POINTS = new int[]{0, 5, 25, 100};
     private static final String[] SEARCH_MINIMUM_COMMENTS_LABELS = new String[]{"Any comments", "5+ comments", "25+ comments", "100+ comments"};
     private static final int[] SEARCH_MINIMUM_COMMENTS = new int[]{0, 5, 25, 100};
+    private static final int USER_ITEM_LIST_FILTER_STORIES = 0;
+    private static final int USER_ITEM_LIST_FILTER_BOTH = 1;
+    private static final int USER_ITEM_LIST_FILTER_COMMENTS = 2;
 
     private int topInset = 0;
     private boolean predictiveSearchBackInProgress = false;
@@ -189,8 +196,9 @@ public class StoriesFragment extends Fragment {
     private boolean predictiveSearchBackLoadingFailedServerError = false;
     private boolean suppressNextSearchRestoreAnimations = false;
     private boolean skipNextSearchRestoreDataSwap = false;
-    private boolean favoritesDropdownVisible = false;
-    private boolean favoritesInitialLoadInProgress = false;
+    private boolean userItemListsDropdownVisible = false;
+    private boolean userItemListInitialLoadInProgress = false;
+    private int userItemListFilter = USER_ITEM_LIST_FILTER_BOTH;
     private RecyclerView.ItemAnimator defaultStoryItemAnimator;
 
     public StoriesFragment() {
@@ -240,6 +248,7 @@ public class StoriesFragment extends Fragment {
         searchButton = view.findViewById(R.id.stories_header_search_button);
         closeSearchButton = view.findViewById(R.id.stories_header_close_search_button);
         moreButton = view.findViewById(R.id.stories_header_more);
+        userItemFilterGroup = view.findViewById(R.id.stories_header_user_item_filter_group);
         loadingIndicator = view.findViewById(R.id.stories_header_loading_indicator);
         loadingFailedLayout = view.findViewById(R.id.stories_header_loading_failed);
         loadingFailedText = view.findViewById(R.id.stories_header_loading_failed_text);
@@ -380,14 +389,15 @@ public class StoriesFragment extends Fragment {
     private ArrayList<CharSequence> buildTypeAdapterList(Context ctx) {
         String[] sortingOptions = getResources().getStringArray(R.array.sorting_options);
         ArrayList<CharSequence> typeAdapterList = new ArrayList<>(Arrays.asList(sortingOptions));
-        if (shouldShowFavoritesTab(ctx)) {
+        if (shouldShowUserItemLists(ctx)) {
             int favoritesIndex = Math.min(SettingsUtils.getBookmarksIndex(getResources()) + 1, typeAdapterList.size());
             typeAdapterList.add(favoritesIndex, SettingsUtils.FAVORITES_LABEL);
+            typeAdapterList.add(SettingsUtils.UPVOTED_LABEL);
         }
         return typeAdapterList;
     }
 
-    private boolean shouldShowFavoritesTab(@Nullable Context ctx) {
+    private boolean shouldShowUserItemLists(@Nullable Context ctx) {
         return ctx != null && AccountUtils.hasAccountDetails(ctx);
     }
 
@@ -397,12 +407,12 @@ public class StoriesFragment extends Fragment {
         }
 
         CharSequence previousTypeLabel = getTypeLabel(adapter.type);
-        boolean shouldShowFavorites = shouldShowFavoritesTab(getContext());
-        if (favoritesDropdownVisible == shouldShowFavorites) {
+        boolean showUserItemLists = shouldShowUserItemLists(getContext());
+        if (userItemListsDropdownVisible == showUserItemLists) {
             return;
         }
 
-        favoritesDropdownVisible = shouldShowFavorites;
+        userItemListsDropdownVisible = showUserItemLists;
         typeSpinnerAdapter.clear();
         typeSpinnerAdapter.addAll(buildTypeAdapterList(getContext()));
         typeSpinnerAdapter.notifyDataSetChanged();
@@ -460,6 +470,21 @@ public class StoriesFragment extends Fragment {
 
         // Set up more button
         moreButton.setOnClickListener(this::moreClick);
+        userItemFilterGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) {
+                return;
+            }
+
+            int newFilter = userItemListFilterFromButtonId(checkedId);
+            if (newFilter == userItemListFilter) {
+                return;
+            }
+
+            userItemListFilter = newFilter;
+            if (isUserItemListType(adapter.type)) {
+                applyUserItemListFilter(true);
+            }
+        });
 
         // Set up search
         searchEditText.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -518,7 +543,7 @@ public class StoriesFragment extends Fragment {
         closeSearchButton.setOnClickListener(view -> closeSearch(view));
 
         // Set up spinner
-        favoritesDropdownVisible = shouldShowFavoritesTab(ctx);
+        userItemListsDropdownVisible = shouldShowUserItemLists(ctx);
         ArrayList<CharSequence> typeAdapterList = buildTypeAdapterList(ctx);
         typeSpinnerAdapter = new ArrayAdapter<>(ctx, R.layout.spinner_top_layout, R.id.selection_dropdown_item_textview, typeAdapterList);
         typeSpinnerAdapter.setDropDownViewResource(R.layout.spinner_item_layout);
@@ -599,9 +624,12 @@ public class StoriesFragment extends Fragment {
 
         boolean bookmarksType = isBookmarksType(adapter.type);
         boolean favoritesType = isFavoritesType(adapter.type);
+        boolean upvotedType = isUpvotedType(adapter.type);
+        boolean userItemListType = favoritesType || upvotedType;
+        userItemFilterGroup.setVisibility(!searching && userItemListType ? View.VISIBLE : View.GONE);
         if (noBookmarksImage != null && noBookmarksText != null) {
-            noBookmarksImage.setImageResource(favoritesType ? R.drawable.ic_action_star : R.drawable.ic_action_bookmark_border);
-            noBookmarksText.setText(favoritesType ? "No favorites" : "No bookmarks");
+            noBookmarksImage.setImageResource(getEmptySavedListIcon(favoritesType, upvotedType));
+            noBookmarksText.setText(getEmptySavedListText(favoritesType, upvotedType));
         }
 
         if (searching) {
@@ -622,7 +650,7 @@ public class StoriesFragment extends Fragment {
             boolean showEmptySavedList = stories.isEmpty()
                     && !loadingFailed
                     && !loadingFailedServerError
-                    && (bookmarksType || (favoritesType && !favoritesInitialLoadInProgress && !swipeRefreshLayout.isRefreshing()));
+                    && (bookmarksType || (userItemListType && !userItemListInitialLoadInProgress && !swipeRefreshLayout.isRefreshing()));
             noBookmarksLayout.setVisibility(showEmptySavedList ? View.VISIBLE : View.GONE);
             searchEmptyContainer.setVisibility(View.GONE);
 
@@ -630,7 +658,7 @@ public class StoriesFragment extends Fragment {
                     && !loadingFailed
                     && !loadingFailedServerError
                     && !bookmarksType
-                    && (!favoritesType || favoritesInitialLoadInProgress);
+                    && (!userItemListType || userItemListInitialLoadInProgress);
             loadingIndicator.setVisibility(showLoading ? View.VISIBLE : View.GONE);
         }
 
@@ -659,6 +687,48 @@ public class StoriesFragment extends Fragment {
         if (predictiveSearchBackInProgress) {
             applySearchBackVisualProgress(predictiveSearchBackProgress);
         }
+    }
+
+    private int getEmptySavedListIcon(boolean favoritesType, boolean upvotedType) {
+        if (favoritesType) {
+            return R.drawable.ic_action_star;
+        }
+        if (upvotedType) {
+            return R.drawable.ic_action_thumbs_up;
+        }
+        return R.drawable.ic_action_bookmark_border;
+    }
+
+    private String getEmptySavedListText(boolean favoritesType, boolean upvotedType) {
+        if (favoritesType) {
+            if (userItemListFilter == USER_ITEM_LIST_FILTER_STORIES) {
+                return "No favorite stories";
+            }
+            if (userItemListFilter == USER_ITEM_LIST_FILTER_COMMENTS) {
+                return "No favorite comments";
+            }
+            return "No favorites";
+        }
+        if (upvotedType) {
+            if (userItemListFilter == USER_ITEM_LIST_FILTER_STORIES) {
+                return "No upvoted stories";
+            }
+            if (userItemListFilter == USER_ITEM_LIST_FILTER_COMMENTS) {
+                return "No upvoted comments";
+            }
+            return "No upvoted items";
+        }
+        return "No bookmarks";
+    }
+
+    private int userItemListFilterFromButtonId(int buttonId) {
+        if (buttonId == R.id.stories_header_user_item_filter_stories) {
+            return USER_ITEM_LIST_FILTER_STORIES;
+        }
+        if (buttonId == R.id.stories_header_user_item_filter_comments) {
+            return USER_ITEM_LIST_FILTER_COMMENTS;
+        }
+        return USER_ITEM_LIST_FILTER_BOTH;
     }
 
     private boolean isSearchSubmitAction(int actionId, @Nullable KeyEvent keyEvent) {
@@ -978,7 +1048,7 @@ public class StoriesFragment extends Fragment {
                 && !loadingFailed
                 && !loadingFailedServerError
                 && !isBookmarksType(adapter.type)
-                && !isFavoritesType(adapter.type);
+                && !isUserItemListType(adapter.type);
     }
 
     private boolean restoreStoriesBeforeSearch() {
@@ -1284,12 +1354,12 @@ public class StoriesFragment extends Fragment {
         hideClicked = SettingsUtils.shouldHideClicked(getContext());
         alwaysOpenComments = SettingsUtils.shouldAlwaysOpenComments(getContext());
         refreshTypeSpinnerItemsIfNeeded();
-        syncVisibleFavoritesWithLocalCache();
+        syncVisibleUserItemListWithLocalCache();
 
         long timeDiff = System.currentTimeMillis() - lastLoaded;
 
         // if more than 1 hr
-        if (timeDiff > 1000 * 60 * 60 && !searching && !isBookmarksType(adapter.type) && !isFavoritesType(adapter.type) && !currentTypeIsAlgolia()) {
+        if (timeDiff > 1000 * 60 * 60 && !searching && !isBookmarksType(adapter.type) && !isUserItemListType(adapter.type) && !currentTypeIsAlgolia()) {
             showUpdateButton();
         }
 
@@ -1516,6 +1586,13 @@ public class StoriesFragment extends Fragment {
                             loadCommentMaster(story, story.parentId, 0, loadGeneration);
                         }
 
+                        if (isUserItemListType(adapter.type) && !shouldShowStoryForUserItemListFilter(story)) {
+                            stories.remove(story);
+                            adapter.notifyItemRemoved(index);
+                            loadedTo = Math.max(-1, loadedTo - 1);
+                            return;
+                        }
+
                         // lets check if we should remove the post because of filter
                         for (String phrase : filterWords) {
                             if (story.title.toLowerCase().contains(phrase.toLowerCase())) {
@@ -1665,12 +1742,12 @@ public class StoriesFragment extends Fragment {
         // cancel all ongoing
         int refreshGeneration = beginStoryListRefresh();
 
-        boolean favoritesTypeForRefresh = isFavoritesType(adapter.type);
+        boolean userItemListTypeForRefresh = isUserItemListType(adapter.type);
         if (showMainLoadingIndicator) {
             loadingFailed = false;
             loadingFailedServerError = false;
             showingCached = false;
-            favoritesInitialLoadInProgress = favoritesTypeForRefresh;
+            userItemListInitialLoadInProgress = userItemListTypeForRefresh;
             replaceStories(new ArrayList<>(), true);
             appBarLayout.setExpanded(true, false);
             recyclerView.scrollToPosition(0);
@@ -1720,15 +1797,15 @@ public class StoriesFragment extends Fragment {
             swipeRefreshLayout.setRefreshing(false);
 
             return;
-        } else if (isFavoritesType(adapter.type)) {
-            boolean shouldLoadCachedFavorites = showMainLoadingIndicator || stories.isEmpty();
-            boolean hasCachedFavorites = shouldLoadCachedFavorites
-                    ? loadFavoriteCache()
-                    : !Utils.loadFavorites(getContext(), true).isEmpty();
-            if (!shouldLoadCachedFavorites) {
+        } else if (isUserItemListType(adapter.type)) {
+            boolean shouldLoadCachedUserItemList = showMainLoadingIndicator || stories.isEmpty();
+            boolean hasCachedUserItemList = shouldLoadCachedUserItemList
+                    ? loadUserItemListCache()
+                    : !loadCurrentUserItemListCache(getContext()).isEmpty();
+            if (!shouldLoadCachedUserItemList) {
                 resumeInterruptedStoryLoads();
             }
-            syncFavoritesFromServer(showSwipeRefreshIndicator || hasCachedFavorites);
+            syncUserItemListFromServer(showSwipeRefreshIndicator || hasCachedUserItemList);
             return;
         } else if (isHistoryType(adapter.type)) {
             ArrayList<Story> refreshedStories = new ArrayList<>();
@@ -1868,22 +1945,22 @@ public class StoriesFragment extends Fragment {
         queue.add(stringRequest);
     }
 
-    private boolean loadFavoriteCache() {
+    private boolean loadUserItemListCache() {
         showingCached = false;
         loadingFailed = false;
         loadingFailedServerError = false;
-        favoritesInitialLoadInProgress = false;
+        userItemListInitialLoadInProgress = false;
 
-        ArrayList<Integer> favoriteIds = loadCachedFavoriteIds(getContext());
-        replaceFavoriteStoriesWithIds(favoriteIds);
-        return !favoriteIds.isEmpty();
+        UserItemListSnapshot snapshot = loadCachedUserItemListSnapshot(getContext());
+        replaceUserItemListStoriesWithIds(snapshot.itemIds, snapshot.commentIds);
+        return !snapshot.itemIds.isEmpty();
     }
 
-    private void syncFavoritesFromServer(boolean showSwipeRefreshIndicator) {
+    private void syncUserItemListFromServer(boolean showSwipeRefreshIndicator) {
         Context ctx = getContext();
         if (ctx == null) {
             swipeRefreshLayout.setRefreshing(false);
-            favoritesInitialLoadInProgress = false;
+            userItemListInitialLoadInProgress = false;
             updateHeader();
             return;
         }
@@ -1891,23 +1968,24 @@ public class StoriesFragment extends Fragment {
         if (!AccountUtils.hasAccountDetails(ctx)) {
             AccountUtils.showLoginPrompt(getParentFragmentManager());
             swipeRefreshLayout.setRefreshing(false);
-            favoritesInitialLoadInProgress = false;
+            userItemListInitialLoadInProgress = false;
             loadingFailed = stories.isEmpty();
             updateHeader();
             return;
         }
 
-        favoritesInitialLoadInProgress = stories.isEmpty() && !showSwipeRefreshIndicator;
+        boolean upvotedTypeForSync = isUpvotedType(adapter.type);
+        userItemListInitialLoadInProgress = stories.isEmpty() && !showSwipeRefreshIndicator;
         swipeRefreshLayout.setRefreshing(showSwipeRefreshIndicator);
         updateHeader();
 
         final int syncGeneration = storyListGeneration;
-        UserActions.fetchFavorites(ctx, new UserActions.FavoritesCallback() {
+        UserActions.UserItemListCallback callback = new UserActions.UserItemListCallback() {
             @Override
-            public void onSuccess(List<Integer> favoriteIds) {
+            public void onSuccess(List<Integer> itemIds, List<Integer> commentIds) {
                 if (!isAdded()
                         || adapter == null
-                        || !isFavoritesType(adapter.type)
+                        || !isSameUserItemListType(adapter.type, upvotedTypeForSync)
                         || !isCurrentStoryListGeneration(syncGeneration)) {
                     return;
                 }
@@ -1917,13 +1995,14 @@ public class StoriesFragment extends Fragment {
                     return;
                 }
 
-                ArrayList<Integer> normalizedFavoriteIds = normalizeFavoriteIds(favoriteIds);
-                if (!favoriteIdsMatchCache(currentContext, normalizedFavoriteIds)) {
-                    Utils.saveFavoriteIds(currentContext, normalizedFavoriteIds);
+                ArrayList<Integer> normalizedItemIds = normalizeUserItemListIds(itemIds);
+                Set<Integer> normalizedCommentIds = normalizeUserItemListCommentIds(normalizedItemIds, commentIds);
+                if (!userItemListIdsMatchCache(currentContext, normalizedItemIds, normalizedCommentIds)) {
+                    saveCurrentUserItemListIds(currentContext, normalizedItemIds, normalizedCommentIds);
                 }
-                syncFavoriteStoriesToIds(normalizedFavoriteIds);
+                syncUserItemListStoriesToIds(normalizedItemIds, normalizedCommentIds);
 
-                favoritesInitialLoadInProgress = false;
+                userItemListInitialLoadInProgress = false;
                 loadingFailed = false;
                 loadingFailedServerError = false;
                 swipeRefreshLayout.setRefreshing(false);
@@ -1934,30 +2013,37 @@ public class StoriesFragment extends Fragment {
             public void onFailure(String summary, String response) {
                 if (!isAdded()
                         || adapter == null
-                        || !isFavoritesType(adapter.type)
+                        || !isSameUserItemListType(adapter.type, upvotedTypeForSync)
                         || !isCurrentStoryListGeneration(syncGeneration)) {
                     return;
                 }
 
                 swipeRefreshLayout.setRefreshing(false);
-                favoritesInitialLoadInProgress = false;
+                userItemListInitialLoadInProgress = false;
                 loadingFailed = stories.isEmpty();
                 updateHeader();
                 Toast.makeText(requireContext(), summary, Toast.LENGTH_SHORT).show();
             }
-        });
+        };
+
+        if (upvotedTypeForSync) {
+            UserActions.fetchUpvoted(ctx, callback);
+        } else {
+            UserActions.fetchFavorites(ctx, callback);
+        }
     }
 
-    private boolean favoriteIdsMatchCache(Context ctx, List<Integer> favoriteIds) {
-        ArrayList<Bookmark> cachedFavorites = Utils.loadFavorites(ctx, true);
-        ArrayList<Integer> normalizedFavoriteIds = normalizeFavoriteIds(favoriteIds);
+    private boolean userItemListIdsMatchCache(Context ctx, List<Integer> itemIds, Set<Integer> commentIds) {
+        ArrayList<Bookmark> cachedItems = loadCurrentUserItemListCache(ctx);
+        ArrayList<Integer> normalizedItemIds = normalizeUserItemListIds(itemIds);
+        Set<Integer> cachedCommentIds = loadCurrentUserItemListCommentIds(ctx);
 
-        if (cachedFavorites.size() != normalizedFavoriteIds.size()) {
+        if (cachedItems.size() != normalizedItemIds.size() || !cachedCommentIds.equals(commentIds)) {
             return false;
         }
 
-        for (int i = 0; i < cachedFavorites.size(); i++) {
-            if (cachedFavorites.get(i).id != normalizedFavoriteIds.get(i)) {
+        for (int i = 0; i < cachedItems.size(); i++) {
+            if (cachedItems.get(i).id != normalizedItemIds.get(i)) {
                 return false;
             }
         }
@@ -1965,55 +2051,75 @@ public class StoriesFragment extends Fragment {
         return true;
     }
 
-    private ArrayList<Integer> loadCachedFavoriteIds(@Nullable Context ctx) {
-        ArrayList<Integer> favoriteIds = new ArrayList<>();
+    private UserItemListSnapshot loadCachedUserItemListSnapshot(@Nullable Context ctx) {
+        ArrayList<Integer> itemIds = new ArrayList<>();
         if (ctx == null) {
-            return favoriteIds;
+            return new UserItemListSnapshot(itemIds, new HashSet<>());
         }
 
-        ArrayList<Bookmark> favorites = Utils.loadFavorites(ctx, true);
-        for (Bookmark favorite : favorites) {
-            if (!favoriteIds.contains(favorite.id)) {
-                favoriteIds.add(favorite.id);
+        ArrayList<Bookmark> items = loadCurrentUserItemListCache(ctx);
+        for (Bookmark item : items) {
+            if (!itemIds.contains(item.id)) {
+                itemIds.add(item.id);
             }
         }
 
-        Collections.sort(favoriteIds, (id1, id2) -> Integer.compare(id2, id1));
-        return favoriteIds;
+        Collections.sort(itemIds, (id1, id2) -> Integer.compare(id2, id1));
+        return new UserItemListSnapshot(itemIds, loadCurrentUserItemListCommentIds(ctx));
     }
 
-    private void syncVisibleFavoritesWithLocalCache() {
-        if (adapter == null || stories == null || !isFavoritesType(adapter.type)) {
+    private ArrayList<Bookmark> loadCurrentUserItemListCache(@Nullable Context ctx) {
+        if (ctx == null) {
+            return new ArrayList<>();
+        }
+        if (isUpvotedType(adapter.type)) {
+            return Utils.loadUpvoted(ctx, true);
+        }
+        return Utils.loadFavorites(ctx, true);
+    }
+
+    private Set<Integer> loadCurrentUserItemListCommentIds(Context ctx) {
+        if (isUpvotedType(adapter.type)) {
+            return Utils.loadUpvotedCommentIds(ctx);
+        }
+        return Utils.loadFavoriteCommentIds(ctx);
+    }
+
+    private void saveCurrentUserItemListIds(Context ctx, List<Integer> itemIds, Set<Integer> commentIds) {
+        if (isUpvotedType(adapter.type)) {
+            Utils.saveUpvotedIds(ctx, itemIds);
+            Utils.saveUpvotedCommentIds(ctx, commentIds);
+        } else {
+            Utils.saveFavoriteIds(ctx, itemIds);
+            Utils.saveFavoriteCommentIds(ctx, commentIds);
+        }
+    }
+
+    private void syncVisibleUserItemListWithLocalCache() {
+        if (adapter == null || stories == null || !isUserItemListType(adapter.type)) {
             return;
         }
 
-        syncFavoriteStoriesToIds(loadCachedFavoriteIds(getContext()));
+        UserItemListSnapshot snapshot = loadCachedUserItemListSnapshot(getContext());
+        syncUserItemListStoriesToIds(snapshot.itemIds, snapshot.commentIds);
     }
 
-    private boolean syncFavoriteStoriesToIds(List<Integer> favoriteIds) {
-        if (favoriteIdsMatchVisibleStories(favoriteIds)) {
+    private boolean syncUserItemListStoriesToIds(List<Integer> itemIds, Set<Integer> commentIds) {
+        if (itemIdsMatchUserItemListStories(itemIds, commentIds)) {
             return false;
         }
 
-        boolean removed = removeStoriesNotInFavoriteIds(favoriteIds);
-        if (!favoriteIdsMatchVisibleStories(favoriteIds)) {
-            replaceFavoriteStoriesWithIds(favoriteIds);
-            return true;
-        }
-
-        if (removed) {
-            updateHeader();
-        }
-        return removed;
+        replaceUserItemListStoriesWithIds(itemIds, commentIds);
+        return true;
     }
 
-    private boolean favoriteIdsMatchVisibleStories(List<Integer> favoriteIds) {
-        if (stories.size() != favoriteIds.size()) {
+    private boolean itemIdsMatchUserItemListStories(List<Integer> itemIds, Set<Integer> commentIds) {
+        if (userItemListStories.size() != itemIds.size() || !userItemListCommentIds.equals(commentIds)) {
             return false;
         }
 
-        for (int i = 0; i < stories.size(); i++) {
-            if (stories.get(i).id != favoriteIds.get(i)) {
+        for (int i = 0; i < userItemListStories.size(); i++) {
+            if (userItemListStories.get(i).id != itemIds.get(i)) {
                 return false;
             }
         }
@@ -2021,53 +2127,88 @@ public class StoriesFragment extends Fragment {
         return true;
     }
 
-    private boolean removeStoriesNotInFavoriteIds(List<Integer> favoriteIds) {
-        Set<Integer> favoriteIdSet = new HashSet<>(favoriteIds);
-        boolean removed = false;
-
-        for (int i = stories.size() - 1; i >= 0; i--) {
-            if (!favoriteIdSet.contains(stories.get(i).id)) {
-                stories.remove(i);
-                adapter.notifyItemRemoved(i);
-                removed = true;
-            }
-        }
-
-        if (removed) {
-            loadedTo = Math.min(loadedTo, stories.size() - 1);
-        }
-
-        return removed;
-    }
-
-    private void replaceFavoriteStoriesWithIds(List<Integer> favoriteIds) {
+    private void replaceUserItemListStoriesWithIds(List<Integer> itemIds, Set<Integer> commentIds) {
         Map<Integer, Story> existingStories = new HashMap<>();
-        for (Story story : stories) {
+        for (Story story : userItemListStories.isEmpty() ? stories : userItemListStories) {
             existingStories.put(story.id, story);
         }
 
         ArrayList<Story> refreshedStories = new ArrayList<>();
-        for (int id : favoriteIds) {
+        for (int id : itemIds) {
             Story existingStory = existingStories.get(id);
-            refreshedStories.add(existingStory != null ? existingStory : new Story("Loading...", id, false, false));
+            Story story = existingStory != null ? existingStory : new Story("Loading...", id, false, false);
+            if (commentIds.contains(id)) {
+                story.isComment = true;
+            }
+            refreshedStories.add(story);
         }
 
         queue.cancelAll(requestTag);
-        replaceStories(refreshedStories, true);
+        userItemListStories.clear();
+        userItemListStories.addAll(refreshedStories);
+        userItemListCommentIds = new HashSet<>(commentIds);
+        replaceStories(getFilteredUserItemListStories(), true);
         loadInitialVisibleStories();
         updateHeader();
     }
 
-    private ArrayList<Integer> normalizeFavoriteIds(List<Integer> favoriteIds) {
-        ArrayList<Integer> normalizedFavoriteIds = new ArrayList<>();
-        for (int id : favoriteIds) {
-            if (!normalizedFavoriteIds.contains(id)) {
-                normalizedFavoriteIds.add(id);
+    private ArrayList<Integer> normalizeUserItemListIds(List<Integer> itemIds) {
+        ArrayList<Integer> normalizedItemIds = new ArrayList<>();
+        for (int id : itemIds) {
+            if (!normalizedItemIds.contains(id)) {
+                normalizedItemIds.add(id);
             }
         }
 
-        Collections.sort(normalizedFavoriteIds, (id1, id2) -> Integer.compare(id2, id1));
-        return normalizedFavoriteIds;
+        Collections.sort(normalizedItemIds, (id1, id2) -> Integer.compare(id2, id1));
+        return normalizedItemIds;
+    }
+
+    private Set<Integer> normalizeUserItemListCommentIds(List<Integer> itemIds, List<Integer> commentIds) {
+        Set<Integer> itemIdSet = new HashSet<>(itemIds);
+        Set<Integer> normalizedCommentIds = new HashSet<>();
+        for (int id : commentIds) {
+            if (itemIdSet.contains(id)) {
+                normalizedCommentIds.add(id);
+            }
+        }
+        return normalizedCommentIds;
+    }
+
+    private ArrayList<Story> getFilteredUserItemListStories() {
+        ArrayList<Story> filteredStories = new ArrayList<>();
+        for (Story story : userItemListStories) {
+            if (shouldShowStoryForUserItemListFilter(story)) {
+                filteredStories.add(story);
+            }
+        }
+        return filteredStories;
+    }
+
+    private boolean shouldShowStoryForUserItemListFilter(Story story) {
+        if (userItemListFilter == USER_ITEM_LIST_FILTER_STORIES) {
+            return !story.isComment;
+        }
+        if (userItemListFilter == USER_ITEM_LIST_FILTER_COMMENTS) {
+            return story.isComment;
+        }
+        return true;
+    }
+
+    private void applyUserItemListFilter(boolean notifyDataSetChanged) {
+        replaceStories(getFilteredUserItemListStories(), notifyDataSetChanged);
+        loadInitialVisibleStories();
+        updateHeader();
+    }
+
+    private static class UserItemListSnapshot {
+        final ArrayList<Integer> itemIds;
+        final Set<Integer> commentIds;
+
+        UserItemListSnapshot(ArrayList<Integer> itemIds, Set<Integer> commentIds) {
+            this.itemIds = itemIds;
+            this.commentIds = commentIds;
+        }
     }
 
     private void loadInitialVisibleStories() {
@@ -2521,8 +2662,20 @@ public class StoriesFragment extends Fragment {
         return TextUtils.equals(getTypeLabel(type), SettingsUtils.FAVORITES_LABEL);
     }
 
+    private boolean isUpvotedType(int type) {
+        return TextUtils.equals(getTypeLabel(type), SettingsUtils.UPVOTED_LABEL);
+    }
+
+    private boolean isUserItemListType(int type) {
+        return isFavoritesType(type) || isUpvotedType(type);
+    }
+
+    private boolean isSameUserItemListType(int type, boolean upvotedType) {
+        return upvotedType ? isUpvotedType(type) : isFavoritesType(type);
+    }
+
     private boolean currentTypeUsesCommentRows() {
-        return isBookmarksType(adapter.type) || isFavoritesType(adapter.type);
+        return isBookmarksType(adapter.type) || isUserItemListType(adapter.type);
     }
 
     @Nullable
@@ -2562,7 +2715,7 @@ public class StoriesFragment extends Fragment {
         boolean usesCommentRows = adapter != null && currentTypeUsesCommentRows();
         if (adapter != null) {
             adapter.allowCommentRows = usesCommentRows;
-            adapter.disableClickedEffects = isBookmarksType(adapter.type) || isFavoritesType(adapter.type) || isHistoryType(adapter.type);
+            adapter.disableClickedEffects = isBookmarksType(adapter.type) || isUserItemListType(adapter.type) || isHistoryType(adapter.type);
         }
         if (recyclerView != null) {
             if (recyclerView.getItemAnimator() != null) {

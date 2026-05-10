@@ -273,7 +273,7 @@ public class StoryRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.
             if (story.spannedText != null) {
                 commentViewHolder.bodyText.setHtml(story.spannedText);
             } else {
-                commentViewHolder.bodyText.setHtml(story.text);
+                commentViewHolder.bodyText.setHtml(story.text == null ? "" : story.text);
                 story.spannedText = (Spanned) commentViewHolder.bodyText.getText();
             }
 

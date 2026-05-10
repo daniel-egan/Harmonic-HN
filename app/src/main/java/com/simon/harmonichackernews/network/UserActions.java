@@ -49,6 +49,7 @@ private static final String LOGIN_PATH = "login";
 private static final String VOTE_PATH = "vote";
 private static final String FAVE_PATH = "fave";
 private static final String FAVORITES_PATH = "favorites";
+private static final String UPVOTED_PATH = "upvoted";
 private static final String COMMENT_PATH = "comment";
 private static final String SUBMIT_PATH = "submit";
 private static final String ITEM_PATH = "item";
@@ -85,7 +86,7 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
 private static final String CAPTCHA_VALIDATION_TEXT = "Validation required. If this doesn't work, you can email";
 private static final String CAPTCHA_RESPONSE_PARAM = "g-recaptcha-response";
 private static final long MAX_RESPONSE_PREVIEW_BYTES = 1024 * 1024;
-private static final int MAX_FAVORITES_PAGES = 50;
+private static final int MAX_USER_ITEM_LIST_PAGES = 50;
 
     public static void voteWithDir(Context ctx, int id, FragmentManager fm, String dir) {
         UserActions.vote(String.valueOf(id), dir, ctx, fm, new UserActions.ActionCallback() {
@@ -160,46 +161,92 @@ private static final int MAX_FAVORITES_PAGES = 50;
         });
     }
 
-    public static void fetchFavorites(Context ctx, FavoritesCallback cb) {
+    public static void fetchFavorites(Context ctx, UserItemListCallback cb) {
+        fetchUserItemList(ctx, FAVORITES_PATH, "favorites", false, cb);
+    }
+
+    public static void fetchUpvoted(Context ctx, UserItemListCallback cb) {
+        fetchUserItemList(ctx, UPVOTED_PATH, "upvoted", true, cb);
+    }
+
+    private static void fetchUserItemList(Context ctx,
+                                          String path,
+                                          String listName,
+                                          boolean loginRequired,
+                                          UserItemListCallback cb) {
         Triple<String, String, Integer> account = AccountUtils.getAccountDetails(ctx);
         if (AccountUtils.handlePossibleError(account, null, ctx)) {
-            cb.onFailure("Login required", "Save your Hacker News login before syncing favorites.");
+            cb.onFailure("Login required", "Save your Hacker News login before syncing " + listName + ".");
             return;
         }
 
-        OkHttpClient client = NetworkComponent.getOkHttpClientInstance();
         Handler main = new Handler(ctx.getMainLooper());
-        ArrayList<Integer> favoriteIds = new ArrayList<>();
+        Runnable fetch = () -> {
+            OkHttpClient client = loginRequired
+                    ? NetworkComponent.getOkHttpClientInstanceWithCookies()
+                    : NetworkComponent.getOkHttpClientInstance();
+            ArrayList<Integer> itemIds = new ArrayList<>();
+            ArrayList<Integer> commentIds = new ArrayList<>();
 
-        fetchFavoritesPage(
-                client,
-                buildFavoritesUrl(account.getFirst(), false),
-                favoriteIds,
-                1,
-                main,
-                new FavoritesCallback() {
-                    @Override
-                    public void onSuccess(List<Integer> ids) {
-                        fetchFavoritesPage(
-                                client,
-                                buildFavoritesUrl(account.getFirst(), true),
-                                ids,
-                                1,
-                                main,
-                                cb);
-                    }
+            fetchUserItemListPage(
+                    client,
+                    buildUserItemListUrl(path, account.getFirst(), false),
+                    itemIds,
+                    commentIds,
+                    1,
+                    false,
+                    listName,
+                    main,
+                    new UserItemListCallback() {
+                        @Override
+                        public void onSuccess(List<Integer> ids, List<Integer> comments) {
+                            fetchUserItemListPage(
+                                    client,
+                                    buildUserItemListUrl(path, account.getFirst(), true),
+                                    ids,
+                                    comments,
+                                    1,
+                                    true,
+                                    listName,
+                                    main,
+                                    cb);
+                        }
 
-                    @Override
-                    public void onFailure(String summary, String response) {
-                        cb.onFailure(summary, response);
-                    }
-                });
+                        @Override
+                        public void onFailure(String summary, String response) {
+                            cb.onFailure(summary, response);
+                        }
+                    });
+        };
+
+        if (!loginRequired) {
+            fetch.run();
+            return;
+        }
+
+        login(ctx, new ActionCallback() {
+            @Override
+            public void onSuccess(Response response) {
+                response.close();
+                fetch.run();
+            }
+
+            @Override
+            public void onFailure(String summary, String response) {
+                cb.onFailure(summary, response);
+            }
+
+            @Override
+            public void onCaptchaRequired(CaptchaChallenge challenge) {
+                cb.onFailure("Captcha required", "HN asked for a captcha before syncing " + listName + ".");
+            }
+        });
     }
 
-    private static String buildFavoritesUrl(String username, boolean comments) {
+    private static String buildUserItemListUrl(String path, String username, boolean comments) {
         HttpUrl.Builder builder = Objects.requireNonNull(HttpUrl.parse(BASE_WEB_URL))
                 .newBuilder()
-                .addPathSegment(FAVORITES_PATH)
+                .addPathSegment(path)
                 .addQueryParameter("id", username);
 
         if (comments) {
@@ -209,12 +256,15 @@ private static final int MAX_FAVORITES_PAGES = 50;
         return builder.build().toString();
     }
 
-    private static void fetchFavoritesPage(OkHttpClient client,
-                                           String url,
-                                           List<Integer> favoriteIds,
-                                           int page,
-                                           Handler main,
-                                           FavoritesCallback cb) {
+    private static void fetchUserItemListPage(OkHttpClient client,
+                                              String url,
+                                              List<Integer> itemIds,
+                                              List<Integer> commentIds,
+                                              int page,
+                                              boolean commentsPage,
+                                              String listName,
+                                              Handler main,
+                                              UserItemListCallback cb) {
         Request request = new Request.Builder()
                 .url(url)
                 .build();
@@ -222,7 +272,7 @@ private static final int MAX_FAVORITES_PAGES = 50;
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                main.post(() -> cb.onFailure("Couldn't sync favorites", e.getMessage()));
+                main.post(() -> cb.onFailure("Couldn't sync " + listName, e.getMessage()));
             }
 
             @Override
@@ -230,7 +280,7 @@ private static final int MAX_FAVORITES_PAGES = 50;
                 if (!response.isSuccessful()) {
                     String failure = response.toString();
                     response.close();
-                    main.post(() -> cb.onFailure("Couldn't sync favorites", failure));
+                    main.post(() -> cb.onFailure("Couldn't sync " + listName, failure));
                     return;
                 }
 
@@ -241,21 +291,24 @@ private static final int MAX_FAVORITES_PAGES = 50;
                         String idString = item.attr("id");
                         if (TextUtils.isDigitsOnly(idString)) {
                             int id = Integer.parseInt(idString);
-                            if (!favoriteIds.contains(id)) {
-                                favoriteIds.add(id);
+                            if (!itemIds.contains(id)) {
+                                itemIds.add(id);
+                            }
+                            if (commentsPage && !commentIds.contains(id)) {
+                                commentIds.add(id);
                             }
                         }
                     }
 
                     Element moreLink = document.selectFirst("a.morelink[href]");
                     String nextPage = moreLink == null ? null : moreLink.absUrl("href");
-                    if (!TextUtils.isEmpty(nextPage) && page < MAX_FAVORITES_PAGES) {
-                        fetchFavoritesPage(client, nextPage, favoriteIds, page + 1, main, cb);
+                    if (!TextUtils.isEmpty(nextPage) && page < MAX_USER_ITEM_LIST_PAGES) {
+                        fetchUserItemListPage(client, nextPage, itemIds, commentIds, page + 1, commentsPage, listName, main, cb);
                     } else {
-                        main.post(() -> cb.onSuccess(favoriteIds));
+                        main.post(() -> cb.onSuccess(itemIds, commentIds));
                     }
                 } catch (Exception e) {
-                    main.post(() -> cb.onFailure("Couldn't parse favorites", e.getMessage()));
+                    main.post(() -> cb.onFailure("Couldn't parse " + listName, e.getMessage()));
                 }
             }
         });
@@ -843,8 +896,8 @@ private static final int MAX_FAVORITES_PAGES = 50;
         }
     }
 
-    public interface FavoritesCallback {
-        void onSuccess(List<Integer> favoriteIds);
+    public interface UserItemListCallback {
+        void onSuccess(List<Integer> itemIds, List<Integer> commentIds);
         void onFailure(String summary, String response);
     }
 
