@@ -4,14 +4,14 @@
     <Preference
         app:key="pref_header_appearance"
         app:title="Appearance"
-        app:summary="Theme, font"
+        app:summary="Theme, visual, text"
         app:icon="@drawable/ic_action_style"
         app:fragment="com.simon.harmonichackernews.settings.AppearancePreferenceFragment" />
 
     <Preference
         app:key="pref_header_stories"
         app:title="Stories"
-        app:summary="Compact view, thumbnails, pagination"
+        app:summary="Layout, behaviorCompact view, thumbnails, pagination"
         app:icon="@drawable/ic_action_bookmark_border"
         app:fragment="com.simon.harmonichackernews.settings.StoriesPreferenceFragment" />
 
@@ -25,14 +25,14 @@
     <Preference
         app:key="pref_header_comments"
         app:title="Comments"
-        app:summary="Text size, sorting, navigation, animations"
+        app:summary="Display, interaction, navigation"
         app:icon="@drawable/ic_action_comment"
         app:fragment="com.simon.harmonichackernews.settings.CommentsPreferenceFragment" />
 
     <Preference
         app:key="pref_header_filters_tags"
         app:title="Filters &amp; Tags"
-        app:summary="Story filters, domain filters, user tags"
+        app:summary="Filters, tags"
         app:icon="@drawable/ic_action_filter"
         app:fragment="com.simon.harmonichackernews.settings.FiltersTagsPreferenceFragment" />
 
