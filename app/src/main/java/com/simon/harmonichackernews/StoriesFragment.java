@@ -1143,7 +1143,8 @@ public class StoriesFragment extends Fragment {
 
                 Story story = stories.get(position);
                 boolean oldClicked = story.clicked;
-                boolean oldBookmarked = Utils.isBookmarked(ctx, story.id);
+                boolean bookmarksEnabled = SettingsUtils.shouldUseBookmarks(ctx);
+                boolean oldBookmarked = bookmarksEnabled && Utils.isBookmarked(ctx, story.id);
                 boolean oldFavorited = Utils.isFavorited(ctx, story.id);
                 History h = HistoriesUtils.INSTANCE.getHistorybyId(story.id);
 
@@ -1172,24 +1173,26 @@ public class StoriesFragment extends Fragment {
                     }
                 });
 
-                popupMenu.getMenu().add(oldBookmarked ? "Remove bookmark" : "Bookmark").setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-                    @Override
-                    public boolean onMenuItemClick(@NonNull MenuItem item) {
-                        if (oldBookmarked) {
-                            Utils.removeBookmark(ctx, story.id);
-                            if (isBookmarksType(adapter.type)) {
-                                stories.remove(story);
-                                adapter.notifyItemRemoved(position);
-                                return true;
+                if (bookmarksEnabled) {
+                    popupMenu.getMenu().add(oldBookmarked ? "Remove bookmark" : "Bookmark").setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                        @Override
+                        public boolean onMenuItemClick(@NonNull MenuItem item) {
+                            if (oldBookmarked) {
+                                Utils.removeBookmark(ctx, story.id);
+                                if (isBookmarksType(adapter.type)) {
+                                    stories.remove(story);
+                                    adapter.notifyItemRemoved(position);
+                                    return true;
+                                }
+                            } else {
+                                Utils.addBookmark(ctx, story.id);
                             }
-                        } else {
-                            Utils.addBookmark(ctx, story.id);
-                        }
 
-                        adapter.notifyItemChanged(position);
-                        return true;
-                    }
-                });
+                            adapter.notifyItemChanged(position);
+                            return true;
+                        }
+                    });
+                }
 
                 popupMenu.getMenu().add(oldFavorited ? "Remove favorite" : "Favorite").setIcon(oldFavorited ? R.drawable.ic_action_star_filled : R.drawable.ic_action_star).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
                     @Override

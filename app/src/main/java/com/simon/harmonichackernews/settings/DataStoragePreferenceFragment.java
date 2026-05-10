@@ -17,6 +17,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.snackbar.Snackbar;
 import com.simon.harmonichackernews.R;
 import com.simon.harmonichackernews.data.Bookmark;
+import com.simon.harmonichackernews.utils.AccountUtils;
 import com.simon.harmonichackernews.utils.HistoriesUtils;
 import com.simon.harmonichackernews.utils.SettingsUtils;
 import com.simon.harmonichackernews.utils.Utils;
@@ -33,6 +34,10 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
 
     private ActivityResultLauncher<Intent> exportLauncher;
     private ActivityResultLauncher<Intent> importLauncher;
+    private Preference enableBookmarksPreference;
+    private Preference addBookmarksToFavoritesPreference;
+    private Preference exportBookmarksPreference;
+    private Preference importBookmarksPreference;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -63,6 +68,7 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
                             ArrayList<Bookmark> bookmarks = Utils.loadBookmarks(true, content);
                             if (!bookmarks.isEmpty()) {
                                 SettingsUtils.saveStringToSharedPreferences(getContext(), Utils.KEY_SHARED_PREFERENCES_BOOKMARKS, content);
+                                updateBookmarksPreferences();
                                 Toast.makeText(getContext(), "Loaded " + bookmarks.size() + " bookmarks", Toast.LENGTH_SHORT).show();
                             } else {
                                 Toast.makeText(getContext(), "File contained no bookmarks", Toast.LENGTH_SHORT).show();
@@ -79,7 +85,31 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.preferences_data_storage, rootKey);
 
-        findPreference("pref_export_bookmarks").setOnPreferenceClickListener(preference -> {
+        enableBookmarksPreference = findPreference(SettingsUtils.PREF_BOOKMARKS_ENABLED);
+        addBookmarksToFavoritesPreference = findPreference("pref_add_bookmarks_to_favorites");
+        exportBookmarksPreference = findPreference("pref_export_bookmarks");
+        importBookmarksPreference = findPreference("pref_import_bookmarks");
+
+        if (enableBookmarksPreference != null) {
+            enableBookmarksPreference.setOnPreferenceChangeListener((preference, newValue) -> {
+                requireView().post(this::updateBookmarksPreferences);
+                return true;
+            });
+        }
+
+        addBookmarksToFavoritesPreference.setOnPreferenceClickListener(preference -> {
+            ArrayList<Bookmark> bookmarks = Utils.loadBookmarks(requireContext(), true);
+            int[] ids = new int[bookmarks.size()];
+            for (int i = 0; i < bookmarks.size(); i++) {
+                ids[i] = bookmarks.get(i).id;
+            }
+
+            AddBookmarksToFavoritesDialogFragment.newInstance(ids)
+                    .show(getParentFragmentManager(), "AddBookmarksToFavoritesDialogFragment");
+            return true;
+        });
+
+        exportBookmarksPreference.setOnPreferenceClickListener(preference -> {
             String textToSave = SettingsUtils.readStringFromSharedPreferences(requireContext(), Utils.KEY_SHARED_PREFERENCES_BOOKMARKS);
 
             if (TextUtils.isEmpty(textToSave)) {
@@ -98,7 +128,7 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
             return false;
         });
 
-        findPreference("pref_import_bookmarks").setOnPreferenceClickListener(preference -> {
+        importBookmarksPreference.setOnPreferenceClickListener(preference -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("text/plain");
@@ -143,5 +173,45 @@ public class DataStoragePreferenceFragment extends BaseSettingsFragment {
                     .show();
             return true;
         });
+
+        updateBookmarksPreferences();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        updateBookmarksPreferences();
+    }
+
+    private void updateBookmarksPreferences() {
+        if (getContext() == null
+                || addBookmarksToFavoritesPreference == null
+                || exportBookmarksPreference == null
+                || importBookmarksPreference == null) {
+            return;
+        }
+
+        boolean bookmarksEnabled = SettingsUtils.shouldUseBookmarks(requireContext());
+        int bookmarkCount = Utils.loadBookmarks(requireContext(), false).size();
+        boolean hasBookmarks = bookmarkCount > 0;
+        boolean loggedIn = AccountUtils.hasAccountDetails(requireContext());
+
+        exportBookmarksPreference.setEnabled(bookmarksEnabled);
+        importBookmarksPreference.setEnabled(bookmarksEnabled);
+
+        addBookmarksToFavoritesPreference.setEnabled(bookmarksEnabled
+                && hasBookmarks
+                && loggedIn);
+        if (!hasBookmarks) {
+            addBookmarksToFavoritesPreference.setSummary("No bookmarks");
+        } else if (!loggedIn) {
+            addBookmarksToFavoritesPreference.setSummary("Login needed");
+        } else {
+            addBookmarksToFavoritesPreference.setSummary(formatBookmarkCount(bookmarkCount));
+        }
+    }
+
+    private static String formatBookmarkCount(int count) {
+        return count == 1 ? "1 bookmark" : count + " bookmarks";
     }
 }

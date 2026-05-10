@@ -506,23 +506,28 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
                 }
             });
 
-            boolean isBookmarked = Utils.isBookmarked(ctx, story.id);
-            headerViewHolder.bookmarkButton.setImageResource(isBookmarked ? R.drawable.ic_action_bookmark_filled : R.drawable.ic_action_bookmark_border);
-            headerViewHolder.bookmarkButton.setContentDescription(isBookmarked ? "Remove bookmark" : "Bookmark");
-            headerViewHolder.bookmarkButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    boolean wasBookmarked = Utils.isBookmarked(view.getContext(), story.id);
+            boolean bookmarksEnabled = SettingsUtils.shouldUseBookmarks(ctx);
+            if (bookmarksEnabled) {
+                boolean isBookmarked = Utils.isBookmarked(ctx, story.id);
+                headerViewHolder.bookmarkButton.setImageResource(isBookmarked ? R.drawable.ic_action_bookmark_filled : R.drawable.ic_action_bookmark_border);
+                headerViewHolder.bookmarkButton.setContentDescription(isBookmarked ? "Remove bookmark" : "Bookmark");
+                headerViewHolder.bookmarkButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        boolean wasBookmarked = Utils.isBookmarked(view.getContext(), story.id);
 
-                    if (wasBookmarked) {
-                        Utils.removeBookmark(view.getContext(), story.id);
-                    } else {
-                        Utils.addBookmark(view.getContext(), story.id);
+                        if (wasBookmarked) {
+                            Utils.removeBookmark(view.getContext(), story.id);
+                        } else {
+                            Utils.addBookmark(view.getContext(), story.id);
+                        }
+
+                        notifyItemChanged(0);
                     }
-
-                    notifyItemChanged(0);
-                }
-            });
+                });
+            } else {
+                headerViewHolder.bookmarkButton.setOnClickListener(null);
+            }
 
             boolean isFavorited = Utils.isFavorited(ctx, story.id);
             headerViewHolder.favoriteButton.setImageResource(isFavorited ? R.drawable.ic_action_star_filled : R.drawable.ic_action_star);
@@ -530,7 +535,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             headerViewHolder.favoriteButton.setContentDescription(isFavorited ? "Remove favorite" : "Favorite");
 
             headerViewHolder.emptyViewText.setText(story.isComment ? "No replies" : "No comments");
-            headerViewHolder.bookmarkButtonParent.setVisibility(VISIBLE);
+            headerViewHolder.bookmarkButtonParent.setVisibility(bookmarksEnabled ? VISIBLE : GONE);
             headerViewHolder.commentButtonParent.setVisibility(Utils.timeInSecondsMoreThanTwoWeeksAgo(story.time) ? GONE : View.VISIBLE);
             headerViewHolder.commentButton.setContentDescription(story.isComment ? "Reply to comment" : "Reply to post");
             headerViewHolder.voteButton.setContentDescription(story.isComment ? "Upvote comment" : "Upvote post");
