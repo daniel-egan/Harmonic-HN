@@ -91,6 +91,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public boolean showTopLevelDepthIndicator;
     public boolean swapLongPressTap;
     public boolean cardStyle;
+    private boolean commentsByOpFilterActive = false;
     public String username;
     public int preferredTextSize;
     private final boolean isTablet;
@@ -117,6 +118,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public final static int FLAG_ACTION_CLICK_EXPAND = -3;
     public final static int FLAG_ACTION_CLICK_BROWSER = -4;
     public final static int FLAG_ACTION_CLICK_INVERT = -5;
+    public final static int FLAG_ACTION_CLICK_RESET_OP_FILTER = -6;
 
     public CommentsRecyclerViewAdapter(boolean useIntegratedWebview,
                                        LinearLayout sheet,
@@ -548,6 +550,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             headerViewHolder.favoriteButton.setContentDescription(isFavorited ? "Remove favorite" : "Favorite");
 
             headerViewHolder.emptyViewText.setText(story.isComment ? "No replies" : "No comments");
+            headerViewHolder.opFilterContainer.setVisibility(commentsByOpFilterActive ? VISIBLE : GONE);
             headerViewHolder.bookmarkButtonParent.setVisibility(bookmarksEnabled ? VISIBLE : GONE);
             headerViewHolder.commentButtonParent.setVisibility(Utils.timeInSecondsMoreThanTwoWeeksAgo(story.time) ? GONE : View.VISIBLE);
             headerViewHolder.commentButton.setContentDescription(story.isComment ? "Reply to comment" : "Reply to post");
@@ -870,6 +873,8 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
         public final LinearLayout linkInfoContainer;
         public final Button retryButton;
         public final Button openInBrowserButton;
+        public final LinearLayout opFilterContainer;
+        public final MaterialButton opFilterResetButton;
         public final LinearLayout pollLayout;
         public final LinearLayout headerView;
 
@@ -921,6 +926,8 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
             bookmarkButtonParent = view.findViewById(R.id.comments_header_button_bookmark_parent);
             retryButton = view.findViewById(R.id.comments_header_retry);
             openInBrowserButton = view.findViewById(R.id.comments_header_open_in_browser);
+            opFilterContainer = view.findViewById(R.id.comments_header_op_filter);
+            opFilterResetButton = view.findViewById(R.id.comments_header_op_filter_reset);
             pollLayout = view.findViewById(R.id.comments_header_poll_layout);
             sheetRefreshButton = view.findViewById(R.id.comments_sheet_layout_refresh);
             sheetExpandButton = view.findViewById(R.id.comments_sheet_layout_expand);
@@ -986,6 +993,7 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
 
             retryButton.setOnClickListener((v) -> retryListener.onRetry());
             openInBrowserButton.setOnClickListener((v) -> retryListener.onOpenInBrowser());
+            opFilterResetButton.setOnClickListener((v) -> headerActionClickListener.onActionClicked(FLAG_ACTION_CLICK_RESET_OP_FILTER, view));
 
             refreshButton.setOnClickListener((v) -> {
                 showUpdate = false;
@@ -1149,6 +1157,13 @@ public class CommentsRecyclerViewAdapter extends RecyclerView.Adapter<RecyclerVi
     public void setNavbarHeight(int navbarHeight) {
         if (this.navbarHeight != navbarHeight) {
             this.navbarHeight = navbarHeight;
+            notifyItemChanged(0);
+        }
+    }
+
+    public void setCommentsByOpFilterActive(boolean active) {
+        if (commentsByOpFilterActive != active) {
+            commentsByOpFilterActive = active;
             notifyItemChanged(0);
         }
     }

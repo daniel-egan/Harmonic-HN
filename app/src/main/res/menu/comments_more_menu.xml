@@ -20,6 +20,9 @@
     <item android:id="@+id/menu_search_comments"
         android:title="Search comments"/>
 
+    <item android:id="@+id/menu_comments_by_op"
+        android:title="Comments by OP"/>
+
     <item
         android:id="@+id/menu_comments_browser"
         android:title="Open in browser" />

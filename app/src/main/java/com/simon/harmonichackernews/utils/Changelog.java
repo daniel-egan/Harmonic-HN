@@ -11,6 +11,7 @@ public class Changelog {
                 "- Updated many parts of settings with previews<br>" +
                 "- Added support for HN CAPTCHAs<br>" +
                 "- Always enable foldable support<br>" +
+                "- Added button to only show comment threads where the OP has commented<br>" +
                 "- Added new setting for graying out clicked posts<br>" +
                 "<br>" +
                 "<b>Version 2.4:</b><br>" +

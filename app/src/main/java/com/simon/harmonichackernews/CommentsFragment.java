@@ -187,6 +187,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
     private BottomSheetFragmentCallback callback;
     private List<Comment> comments;
+    private List<Comment> allComments;
     private RequestQueue queue;
     private final Object requestTag = new Object();
     private CommentsRecyclerViewAdapter adapter;
@@ -242,6 +243,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private int scrollToCommentId = -1;
     private int searchedCommentScrollTopTargetId = -1;
     private boolean searchedCommentScrollTopPending = false;
+    private boolean commentsByOpFilterActive = false;
     private final Handler nitterLinkPreviewHandler = new Handler(Looper.getMainLooper());
     private int nitterLinkPreviewGeneration = 0;
 
@@ -550,7 +552,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         webViewContainer.setBackgroundColor(ContextCompat.getColor(requireContext(), ThemeUtils.getBackgroundColorResource(requireContext())));
 
         comments = new ArrayList<>();
-        comments.add(new Comment()); // header
+        Comment headerComment = new Comment();
+        comments.add(headerComment); // header
+        allComments = new ArrayList<>();
+        allComments.add(headerComment);
 
         username = AccountUtils.getAccountUsername(getContext());
 
@@ -709,6 +714,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 SettingsUtils.shouldSwapCommentLongPressTap(getContext()),
                 SettingsUtils.shouldUseCardCommentDisplayStyle(getContext()),
                 this);
+        adapter.setCommentsByOpFilterActive(commentsByOpFilterActive);
         adapter.loadUserTags(requireContext());
 
         adapter.setOnHeaderClickListener(story1 -> Utils.launchCustomTab(getActivity(), story1.url));
@@ -845,6 +851,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                             }
                         }
 
+                        break;
+
+                    case CommentsRecyclerViewAdapter.FLAG_ACTION_CLICK_RESET_OP_FILTER:
+                        resetCommentsByOpFilter();
                         break;
                 }
             }
@@ -1598,6 +1608,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
     @Override
     public void onRetry() {
+        resetCommentsByOpFilter();
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setRefreshing(true);
         }
@@ -1653,6 +1664,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 story.parentId = loadedStory.parentId;
 
                 // Reset comments
+                setCommentsByOpFilterActive(false);
+                if (allComments != null && allComments.size() > 1) {
+                    allComments.subList(1, allComments.size()).clear();
+                }
                 int oldSize = comments.size();
                 if (oldSize > 1) {
                     comments.subList(1, oldSize).clear();
@@ -1678,9 +1693,14 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             @Override
             public void onAllCommentsLoaded(List<Comment> loadedComments) {
                 // Add all comments at once in proper tree order
-                comments.addAll(loadedComments);
-                adapter.invalidateCommentLookup();
-                adapter.notifyItemRangeInserted(1, loadedComments.size());
+                allComments.addAll(loadedComments);
+                if (commentsByOpFilterActive) {
+                    applyDisplayedComments(getDisplayedCommentsForCurrentFilter(allComments));
+                } else {
+                    comments.addAll(loadedComments);
+                    adapter.invalidateCommentLookup();
+                    adapter.notifyItemRangeInserted(1, loadedComments.size());
+                }
                 adapter.commentsLoaded = true;
                 updateNavigationVisibility();
                 adapter.notifyItemChanged(0);
@@ -1940,7 +1960,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     }
 
     private void handleJsonResponse(final int id, final String response, final boolean cache, final boolean forceHeaderRefresh, boolean restoreScroll) {
-        int oldCommentCount = comments.size();
+        int oldCommentCount = getAllCommentsSource().size();
 
         // This is what we get if the Algolia API has not indexed the post,
         // we should attempt to show the user an option to switch API:s in this
@@ -1962,7 +1982,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             List<Comment> parsedComments = JSONParser.parseAlgoliaComments(children, story.kids, filteredUsers);
             applyParsedComments(parsedComments);
 
-            boolean storyChanged = JSONParser.updateStoryInformation(story, jsonObject, forceHeaderRefresh, oldCommentCount, comments.size());
+            boolean storyChanged = JSONParser.updateStoryInformation(story, jsonObject, forceHeaderRefresh, oldCommentCount, getAllCommentsSource().size());
             if (storyChanged || forceHeaderRefresh) {
                 adapter.notifyItemChanged(0);
             }
@@ -2013,13 +2033,14 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private void applyParsedComments(List<Comment> parsedComments) {
         List<Comment> oldComments = copyCommentsForDiff(comments);
         Map<Integer, Comment> existingCommentsById = new HashMap<>();
-        for (int i = 1; i < comments.size(); i++) {
-            Comment comment = comments.get(i);
+        List<Comment> sourceComments = getAllCommentsSource();
+        for (int i = 1; i < sourceComments.size(); i++) {
+            Comment comment = sourceComments.get(i);
             existingCommentsById.put(comment.id, comment);
         }
 
         List<Comment> nextComments = new ArrayList<>(parsedComments.size() + 1);
-        nextComments.add(comments.get(0));
+        nextComments.add(sourceComments.get(0));
         for (Comment parsedComment : parsedComments) {
             Comment existingComment = existingCommentsById.get(parsedComment.id);
             if (existingComment != null) {
@@ -2040,6 +2061,126 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             }
         }
 
+        allComments.clear();
+        allComments.addAll(nextComments);
+        applyDisplayedComments(getDisplayedCommentsForCurrentFilter(allComments), oldComments);
+    }
+
+    private List<Comment> getAllCommentsSource() {
+        if (allComments == null || allComments.isEmpty()) {
+            return comments;
+        }
+        return allComments;
+    }
+
+    private void showCommentsByOp() {
+        List<Comment> sourceComments = getAllCommentsSource();
+        if (!hasCommentsByOp(sourceComments)) {
+            return;
+        }
+
+        setCommentsByOpFilterActive(true);
+        applyDisplayedComments(buildCommentsByOpThreadList(sourceComments));
+    }
+
+    private void resetCommentsByOpFilter() {
+        if (!commentsByOpFilterActive) {
+            return;
+        }
+
+        setCommentsByOpFilterActive(false);
+        applyDisplayedComments(new ArrayList<>(getAllCommentsSource()));
+    }
+
+    private void setCommentsByOpFilterActive(boolean active) {
+        commentsByOpFilterActive = active;
+        if (adapter != null) {
+            adapter.setCommentsByOpFilterActive(active);
+        }
+    }
+
+    private List<Comment> getDisplayedCommentsForCurrentFilter(List<Comment> sourceComments) {
+        if (commentsByOpFilterActive) {
+            if (hasCommentsByOp(sourceComments)) {
+                return buildCommentsByOpThreadList(sourceComments);
+            }
+            setCommentsByOpFilterActive(false);
+        }
+        return new ArrayList<>(sourceComments);
+    }
+
+    private boolean hasCommentsByOp() {
+        return hasCommentsByOp(getAllCommentsSource());
+    }
+
+    private boolean hasCommentsByOp(List<Comment> sourceComments) {
+        if (story == null || TextUtils.isEmpty(story.by)) {
+            return false;
+        }
+
+        for (int i = 1; i < sourceComments.size(); i++) {
+            if (TextUtils.equals(story.by, sourceComments.get(i).by)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<Comment> buildCommentsByOpThreadList(List<Comment> sourceComments) {
+        List<Comment> filteredComments = new ArrayList<>();
+        if (sourceComments.isEmpty()) {
+            return filteredComments;
+        }
+
+        filteredComments.add(sourceComments.get(0));
+
+        Map<Integer, Comment> commentsById = new HashMap<>();
+        for (int i = 1; i < sourceComments.size(); i++) {
+            Comment comment = sourceComments.get(i);
+            commentsById.put(comment.id, comment);
+        }
+
+        Set<Integer> includedCommentIds = new HashSet<>();
+        for (int i = 1; i < sourceComments.size(); i++) {
+            Comment comment = sourceComments.get(i);
+            if (!TextUtils.equals(story.by, comment.by)) {
+                continue;
+            }
+
+            includeCommentAndAncestors(comment, commentsById, includedCommentIds, sourceComments.size());
+            int opCommentDepth = comment.depth;
+            for (int j = i + 1; j < sourceComments.size(); j++) {
+                Comment candidate = sourceComments.get(j);
+                if (candidate.depth <= opCommentDepth) {
+                    break;
+                }
+                includedCommentIds.add(candidate.id);
+            }
+        }
+
+        for (int i = 1; i < sourceComments.size(); i++) {
+            Comment comment = sourceComments.get(i);
+            if (includedCommentIds.contains(comment.id)) {
+                filteredComments.add(comment);
+            }
+        }
+        return filteredComments;
+    }
+
+    private void includeCommentAndAncestors(Comment comment, Map<Integer, Comment> commentsById, Set<Integer> includedCommentIds, int maxDepth) {
+        Comment current = comment;
+        int guard = 0;
+        while (current != null && guard++ < maxDepth) {
+            includedCommentIds.add(current.id);
+            current = commentsById.get(current.parent);
+        }
+    }
+
+    private void applyDisplayedComments(List<Comment> nextComments) {
+        applyDisplayedComments(nextComments, copyCommentsForDiff(comments));
+    }
+
+    private void applyDisplayedComments(List<Comment> nextComments, List<Comment> oldComments) {
         DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
             @Override
             public int getOldListSize() {
@@ -2070,8 +2211,12 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
         comments.clear();
         comments.addAll(nextComments);
-        adapter.invalidateCommentLookup();
-        diffResult.dispatchUpdatesTo(adapter);
+        if (adapter != null) {
+            adapter.invalidateCommentLookup();
+            diffResult.dispatchUpdatesTo(adapter);
+            adapter.notifyItemChanged(0);
+        }
+        updateNavigationVisibility();
     }
 
     private List<Comment> copyCommentsForDiff(List<Comment> source) {
@@ -2202,6 +2347,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                         }
                     });
                 } else if (id == R.id.menu_search_comments) {
+                    resetCommentsByOpFilter();
                     CommentsSearchDialogFragment.showCommentSearchDialog(getParentFragmentManager(), comments, new CommentsSearchDialogFragment.CommentSelectedListener() {
                         @Override
                         public void onCommentSelected(Comment comment) {
@@ -2219,6 +2365,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                             }
                         }
                     });
+                } else if (id == R.id.menu_comments_by_op) {
+                    showCommentsByOp();
                 } else if (id == R.id.menu_comments_browser) {
                     onOpenInBrowser();
                 }
@@ -2240,7 +2388,11 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 item.setVisible(false);
             }
 
-            if (item.getItemId() == R.id.menu_search_comments && comments.size() < 2) {
+            if (item.getItemId() == R.id.menu_search_comments && getAllCommentsSource().size() < 2) {
+                item.setVisible(false);
+            }
+
+            if (item.getItemId() == R.id.menu_comments_by_op && !hasCommentsByOp()) {
                 item.setVisible(false);
             }
 

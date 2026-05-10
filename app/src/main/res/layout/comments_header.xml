@@ -900,6 +900,40 @@
         android:layout_height="1dp"
         android:background="?attr/commentDividerColor"/>
 
+    <LinearLayout
+        android:id="@+id/comments_header_op_filter"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginBottom="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/product_sans"
+            android:paddingRight="12dp"
+            android:text="Only showing comment threads where the OP has commented"
+            android:textColor="?attr/storyColorNormal"
+            android:textSize="15sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/comments_header_op_filter_reset"
+            style="@style/Widget.Material3Expressive.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:fontFamily="@font/product_sans_bold"
+            android:minWidth="64dp"
+            android:text="Reset"
+            android:textAllCaps="false"
+            android:textColor="?attr/colorSecondary" />
+
+    </LinearLayout>
+
     <com.google.android.material.loadingindicator.LoadingIndicator
         android:id="@+id/comments_header_loading"
         android:indeterminate="true"
