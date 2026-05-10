@@ -181,6 +181,9 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private final static int COMMENT_ACTION_UNVOTE = 7;
     private final static int COMMENT_ACTION_DOWNVOTE = 8;
     private final static int COMMENT_ACTION_REPLY = 9;
+    private static final int NITTER_LINK_PREVIEW_MAX_ATTEMPTS = 4;
+    private static final long NITTER_LINK_PREVIEW_HTML_READ_TIMEOUT_MS = 2500;
+    private static final long[] NITTER_LINK_PREVIEW_RETRY_DELAYS_MS = {500, 1500, 3000};
 
     private BottomSheetFragmentCallback callback;
     private List<Comment> comments;
@@ -239,6 +242,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private int scrollToCommentId = -1;
     private int searchedCommentScrollTopTargetId = -1;
     private boolean searchedCommentScrollTopPending = false;
+    private final Handler nitterLinkPreviewHandler = new Handler(Looper.getMainLooper());
+    private int nitterLinkPreviewGeneration = 0;
 
     // Clean fallback management
     private AlgoliaFallbackManager fallbackManager;
@@ -1196,6 +1201,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         if (webView == null) {
             return;
         }
+        cancelPendingNitterLinkPreviewRead();
         if (!OFFLINE_PAGE_URL.equals(url)) {
             showingErrorPage = false;
             showingCachedArticlePage = false;
@@ -1225,6 +1231,12 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 && shouldLoadNitterLinkPreview(url);
         if (loadingNitterPreview) {
             setLinkPreviewLoading(true);
+        } else if (story != null
+                && story.linkPreviewLoading
+                && story.nitterInfo == null
+                && !shouldLoadNitterLinkPreview(url)
+                && shouldLoadNitterLinkPreview(story.url)) {
+            setLinkPreviewLoading(false);
         }
 
         if (NitterGetter.isConvertibleToNitter(url) && SettingsUtils.shouldRedirectNitter(getContext())) {
@@ -1528,6 +1540,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     }
 
     public void destroyWebView() {
+        cancelPendingNitterLinkPreviewRead();
         // Nuclear
         if (webView != null) {
             if (webView.getParent() instanceof ViewGroup) {
@@ -1775,6 +1788,81 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         return NitterGetter.isConvertibleToNitter(url)
                 && SettingsUtils.shouldRedirectNitter(getContext())
                 && SettingsUtils.shouldUseLinkPreviewX(getContext());
+    }
+
+    private void cancelPendingNitterLinkPreviewRead() {
+        nitterLinkPreviewGeneration++;
+        nitterLinkPreviewHandler.removeCallbacksAndMessages(null);
+    }
+
+    private void readNitterLinkPreviewWithRetry(WebView view, String url) {
+        if (story == null || story.nitterInfo != null) {
+            return;
+        }
+        cancelPendingNitterLinkPreviewRead();
+        setLinkPreviewLoading(true);
+        readNitterLinkPreviewAttempt(view, url, nitterLinkPreviewGeneration, 0);
+    }
+
+    private void readNitterLinkPreviewAttempt(WebView view, String url, int generation, int attempt) {
+        Context context = getContext();
+        if (context == null || !isCurrentNitterLinkPreviewRead(view, url, generation)) {
+            return;
+        }
+
+        final boolean[] finished = {false};
+        nitterLinkPreviewHandler.postDelayed(() -> {
+            if (finished[0] || !isCurrentNitterLinkPreviewRead(view, url, generation)) {
+                return;
+            }
+            finished[0] = true;
+            onNitterLinkPreviewReadFailed(view, url, generation, attempt);
+        }, NITTER_LINK_PREVIEW_HTML_READ_TIMEOUT_MS);
+
+        NitterGetter.getInfo(view, context, new NitterGetter.GetterCallback() {
+            @Override
+            public void onSuccess(NitterInfo nitterInfo) {
+                if (finished[0] || !isCurrentNitterLinkPreviewRead(view, url, generation)) {
+                    return;
+                }
+                finished[0] = true;
+                story.nitterInfo = nitterInfo;
+                setLinkPreviewLoading(false);
+            }
+
+            @Override
+            public void onFailure(String reason) {
+                if (finished[0] || !isCurrentNitterLinkPreviewRead(view, url, generation)) {
+                    return;
+                }
+                finished[0] = true;
+                onNitterLinkPreviewReadFailed(view, url, generation, attempt);
+            }
+        });
+    }
+
+    private void onNitterLinkPreviewReadFailed(WebView view, String url, int generation, int attempt) {
+        int nextAttempt = attempt + 1;
+        if (nextAttempt < NITTER_LINK_PREVIEW_MAX_ATTEMPTS) {
+            long delay = NITTER_LINK_PREVIEW_RETRY_DELAYS_MS[Math.min(attempt, NITTER_LINK_PREVIEW_RETRY_DELAYS_MS.length - 1)];
+            nitterLinkPreviewHandler.postDelayed(() ->
+                            readNitterLinkPreviewAttempt(view, url, generation, nextAttempt),
+                    delay);
+            return;
+        }
+
+        if (isCurrentNitterLinkPreviewRead(view, url, generation)) {
+            setLinkPreviewLoading(false);
+        }
+    }
+
+    private boolean isCurrentNitterLinkPreviewRead(WebView view, String url, int generation) {
+        return generation == nitterLinkPreviewGeneration
+                && view != null
+                && view == webView
+                && story != null
+                && story.nitterInfo == null
+                && NitterGetter.isValidNitterUrl(url);
     }
 
     private void maybeLoadPollOptions() {
@@ -2874,18 +2962,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             }
 
             if (NitterGetter.isValidNitterUrl(url) && SettingsUtils.shouldUseLinkPreviewX(getContext())) {
-                NitterGetter.getInfo(view, getContext(), new NitterGetter.GetterCallback() {
-                    @Override
-                    public void onSuccess(NitterInfo nitterInfo) {
-                        story.nitterInfo = nitterInfo;
-                        setLinkPreviewLoading(false);
-                    }
-
-                    @Override
-                    public void onFailure(String reason) {
-                        setLinkPreviewLoading(false);
-                    }
-                });
+                readNitterLinkPreviewWithRetry(view, url);
             }
         }
 

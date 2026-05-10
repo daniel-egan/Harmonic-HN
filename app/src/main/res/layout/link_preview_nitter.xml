@@ -63,7 +63,8 @@
         android:layout_height="wrap_content">
 
         <LinearLayout
-            android:layout_gravity="center_vertical"
+            android:layout_gravity="bottom"
+            android:paddingBottom="12dp"
             android:orientation="vertical"
             android:layout_weight="1"
             android:layout_width="0dp"
@@ -163,13 +164,14 @@
             android:textSize="14sp"
             android:textColor="#eee"
             app:backgroundTint="#000"
-            android:elevation="4dp"
+            android:elevation="2dp"
             android:text="Open in app"
+            android:layout_marginBottom="4dp"
             style="@style/Widget.Material3Expressive.Button.IconButton.Filled"
             android:layout_width="wrap_content"
             android:layout_gravity="right"
             app:iconPadding="20dp"
-            android:layout_height="56dp"/>
+            android:layout_height="52dp"/>
 
     </LinearLayout>
 
