@@ -396,6 +396,7 @@ public class StoriesFragment extends Fragment {
             return;
         }
 
+        CharSequence previousTypeLabel = getTypeLabel(adapter.type);
         boolean shouldShowFavorites = shouldShowFavoritesTab(getContext());
         if (favoritesDropdownVisible == shouldShowFavorites) {
             return;
@@ -406,13 +407,21 @@ public class StoriesFragment extends Fragment {
         typeSpinnerAdapter.addAll(buildTypeAdapterList(getContext()));
         typeSpinnerAdapter.notifyDataSetChanged();
 
-        if (!shouldShowFavorites && isFavoritesType(adapter.type)) {
-            adapter.type = 0;
+        int newType = getTypeIndex(previousTypeLabel);
+        if (newType < 0) {
+            newType = 0;
+        }
+
+        CharSequence newTypeLabel = getTypeLabel(newType);
+        boolean typeChanged = !TextUtils.equals(previousTypeLabel, newTypeLabel);
+        if (adapter.type != newType || typeChanged) {
+            adapter.type = newType;
             updateAdapterCommentRows();
-            typeSpinner.setSelection(0);
+        }
+
+        typeSpinner.setSelection(newType);
+        if (typeChanged) {
             attemptStoryTypeRefresh();
-        } else {
-            typeSpinner.setSelection(Math.min(adapter.type, typeSpinnerAdapter.getCount() - 1));
         }
     }
 
@@ -1220,8 +1229,12 @@ public class StoriesFragment extends Fragment {
                                 } else if (currentIndex >= 0) {
                                     adapter.notifyItemChanged(currentIndex);
                                 }
-                                UserActions.showFailureDetailDialog(ctx, summary, response);
-                                Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                                if (newFavorited) {
+                                    Toast.makeText(ctx, "Couldn't add favorite", Toast.LENGTH_SHORT).show();
+                                } else {
+                                    UserActions.showFailureDetailDialog(ctx, summary, response);
+                                    Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                                }
                             }
                         });
                         return true;
@@ -2526,6 +2539,20 @@ public class StoriesFragment extends Fragment {
 
         ArrayList<CharSequence> typeAdapterList = buildTypeAdapterList(ctx);
         return type < typeAdapterList.size() ? typeAdapterList.get(type) : null;
+    }
+
+    private int getTypeIndex(@Nullable CharSequence label) {
+        if (label == null || typeSpinnerAdapter == null) {
+            return -1;
+        }
+
+        for (int i = 0; i < typeSpinnerAdapter.getCount(); i++) {
+            if (TextUtils.equals(label, typeSpinnerAdapter.getItem(i))) {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private void updateAdapterCommentRows() {

@@ -2184,8 +2184,12 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             public void onFailure(String summary, String response) {
                 Utils.setFavorite(ctx, adapter.story.id, wasFavorited);
                 adapter.notifyItemChanged(0);
-                UserActions.showFailureDetailDialog(ctx, summary, response);
-                Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                if (!wasFavorited) {
+                    Toast.makeText(ctx, "Couldn't add favorite", Toast.LENGTH_SHORT).show();
+                } else {
+                    UserActions.showFailureDetailDialog(ctx, summary, response);
+                    Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
