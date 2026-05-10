@@ -174,7 +174,7 @@
             android:src="@drawable/ic_action_comment"   />
 
         <TextView
-            tools:text="18"
+            android:text="18"
             android:fontFamily="@font/product_sans"
             android:textStyle="bold"
             android:textColor="?attr/storyColorNormal"

@@ -5,9 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.transition.AutoTransition;
+import android.transition.ChangeBounds;
 import android.transition.TransitionManager;
-import android.transition.TransitionSet;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.PathInterpolator;
@@ -23,6 +22,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.preference.PreferenceManager;
 
 import com.simon.harmonichackernews.databinding.ActivityWelcomeBinding;
+import com.simon.harmonichackernews.utils.SettingsUtils;
 import com.simon.harmonichackernews.utils.ThemeUtils;
 
 public class WelcomeActivity extends AppCompatActivity {
@@ -65,6 +65,22 @@ public class WelcomeActivity extends AppCompatActivity {
         TextView storyMeta = binding.storyListItem.storyMeta;
         storyMeta.setText("53 points \u2022 quantamagazine.org \u2022 2h");
         binding.storyListItem.storyIndex.setVisibility(View.VISIBLE);
+        binding.storyListItem.storyPreviewImageSmall.setImageResource(R.drawable.web_preview);
+        binding.storyListItem.storyPreviewImageLarge.setImageResource(R.drawable.web_preview);
+        String initialPreviewImageMode = SettingsUtils.getPreferredStoryPreviewImageMode(this);
+        updatePreviewImageMode(binding, initialPreviewImageMode);
+
+        binding.welcomeStoryPreviewImageModeGroup.check(getButtonIdForPreviewImageMode(initialPreviewImageMode));
+        binding.welcomeStoryPreviewImageModeGroup.addOnButtonCheckedListener((buttonGroup, checkedId, isChecked) -> {
+            if (!isChecked) {
+                return;
+            }
+
+            String previewImageMode = getPreviewImageModeForButtonId(checkedId);
+            beginPreviewTransition(binding);
+            updatePreviewImageMode(binding, previewImageMode);
+            setSetting(buttonGroup.getContext(), SettingsUtils.PREF_STORY_PREVIEW_IMAGE_MODE, previewImageMode);
+        });
 
         binding.welcomeSwitchThumbnails.setOnCheckedChangeListener((@NonNull CompoundButton compoundButton, boolean b) -> {
             beginPreviewTransition(binding);
@@ -101,15 +117,44 @@ public class WelcomeActivity extends AppCompatActivity {
 
     private void beginPreviewTransition(ActivityWelcomeBinding binding) {
         ViewGroup previewRoot = (ViewGroup) binding.storyListItem.getRoot();
-        if (!ViewCompat.isLaidOut(previewRoot)) {
+        ViewGroup transitionRoot = previewRoot.getParent() instanceof ViewGroup
+                ? (ViewGroup) previewRoot.getParent()
+                : previewRoot;
+        if (!ViewCompat.isLaidOut(transitionRoot)) {
             return;
         }
 
-        AutoTransition transition = new AutoTransition();
-        transition.setOrdering(TransitionSet.ORDERING_TOGETHER);
+        ChangeBounds transition = new ChangeBounds();
         transition.setDuration(PREVIEW_ANIMATION_DURATION_MS);
         transition.setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f));
-        TransitionManager.beginDelayedTransition(previewRoot, transition);
+        TransitionManager.beginDelayedTransition(transitionRoot, transition);
+    }
+
+    private void updatePreviewImageMode(ActivityWelcomeBinding binding, String previewImageMode) {
+        boolean showSmallPreview = SettingsUtils.STORY_PREVIEW_IMAGE_SMALL.equals(previewImageMode);
+        boolean showLargePreview = SettingsUtils.STORY_PREVIEW_IMAGE_LARGE.equals(previewImageMode);
+        binding.storyListItem.storyPreviewImageSmall.setVisibility(showSmallPreview ? View.VISIBLE : View.GONE);
+        binding.storyListItem.storyPreviewImageLarge.setVisibility(showLargePreview ? View.VISIBLE : View.GONE);
+    }
+
+    private String getPreviewImageModeForButtonId(int checkedId) {
+        if (checkedId == R.id.welcome_story_preview_image_mode_small) {
+            return SettingsUtils.STORY_PREVIEW_IMAGE_SMALL;
+        }
+        if (checkedId == R.id.welcome_story_preview_image_mode_large) {
+            return SettingsUtils.STORY_PREVIEW_IMAGE_LARGE;
+        }
+        return SettingsUtils.STORY_PREVIEW_IMAGE_OFF;
+    }
+
+    private int getButtonIdForPreviewImageMode(String previewImageMode) {
+        if (SettingsUtils.STORY_PREVIEW_IMAGE_SMALL.equals(previewImageMode)) {
+            return R.id.welcome_story_preview_image_mode_small;
+        }
+        if (SettingsUtils.STORY_PREVIEW_IMAGE_LARGE.equals(previewImageMode)) {
+            return R.id.welcome_story_preview_image_mode_large;
+        }
+        return R.id.welcome_story_preview_image_mode_off;
     }
 
     @SuppressLint("SetTextI18n")
