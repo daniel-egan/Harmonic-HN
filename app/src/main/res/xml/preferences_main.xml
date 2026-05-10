@@ -39,7 +39,7 @@
     <Preference
         app:key="pref_header_data_storage"
         app:title="Data"
-        app:summary="Bookmarks, history, changelogs"
+        app:summary="Bookmarks, history, other"
         app:icon="@drawable/ic_action_library_books"
         app:fragment="com.simon.harmonichackernews.settings.DataStoragePreferenceFragment" />
 
