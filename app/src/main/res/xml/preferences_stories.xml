@@ -63,7 +63,7 @@
         <SwitchPreferenceCompat
             app:singleLineTitle="false"
             app:key="pref_show_index"
-            app:defaultValue="false"
+            app:defaultValue="true"
             app:icon="@drawable/ic_action_index"
             app:title="Show story indices" />
 

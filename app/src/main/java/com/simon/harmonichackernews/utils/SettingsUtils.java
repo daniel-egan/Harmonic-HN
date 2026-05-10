@@ -106,7 +106,7 @@ public class SettingsUtils {
     }
 
     public static boolean shouldShowIndex(Context ctx) {
-        return getBooleanPref("pref_show_index", false, ctx);
+        return getBooleanPref("pref_show_index", true, ctx);
     }
 
     public static boolean shouldShowNavigationButtons(Context ctx) {

@@ -68,6 +68,7 @@ public class WelcomeActivity extends AppCompatActivity {
         storyMeta.setText("quantamagazine.org • 2 hrs");
         storyMetaPoints.setVisibility(View.VISIBLE);
         storyMetaPoints.setAlpha(1f);
+        binding.storyListItem.storyIndex.setVisibility(View.VISIBLE);
 
         binding.welcomeSwitchThumbnails.setOnCheckedChangeListener((@NonNull CompoundButton compoundButton, boolean b) -> {
             beginPreviewTransition(binding);

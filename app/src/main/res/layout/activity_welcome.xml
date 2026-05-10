@@ -268,7 +268,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/product_sans"
                 android:textSize="16sp"
-                android:checked="false"
+                android:checked="true"
                 android:text="Indices"   />
 
             <TextView
