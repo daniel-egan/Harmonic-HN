@@ -1,5 +1,6 @@
 package com.simon.harmonichackernews.settings;
 
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -38,12 +39,17 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
     private ImageView commentsIcon;
     private ImageView smallPreviewImage;
     private ImageView largePreviewImage;
+    private View previewDetailsRow;
     private TextView storyTitle;
     private TextView storyIndex;
     private TextView storyMeta;
     private TextView comments;
+    private View boundItemView;
     private boolean leftAligned;
     private int commentsIconResId = R.drawable.ic_action_comment;
+    private int previewDetailsRowHeight;
+    private ValueAnimator previewHeightAnimator;
+    private String previewImageModeOverride;
 
     public StoryContentPreviewPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -61,8 +67,10 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
 
         holder.itemView.setClickable(false);
         holder.itemView.setFocusable(false);
+        holder.setIsRecyclable(false);
 
         View itemView = holder.itemView;
+        boundItemView = itemView;
         View root = itemView.findViewById(R.id.story_content_preview_root);
         previewRoot = root instanceof ViewGroup
                 ? (ViewGroup) root
@@ -73,6 +81,7 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         leftAligned = SettingsUtils.shouldUseLeftAlign(getContext());
         inflatePreviewItem(leftAligned);
         updatePreview(false);
+        itemView.requestLayout();
     }
 
     public void updateThumbnails(boolean showThumbnails) {
@@ -104,7 +113,7 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
     }
 
     public void updatePreviewImageMode(String previewImageMode) {
-        updatePreview(null, null, null, null, null, null, null, previewImageMode, true);
+        applyPreviewImageMode(previewImageMode, true);
     }
 
     @Override
@@ -127,13 +136,23 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        if (SettingsUtils.PREF_STORY_PREVIEW_IMAGE_MODE.equals(key)) {
+            String previewImageMode = sharedPreferences.getString(
+                    key,
+                    SettingsUtils.STORY_PREVIEW_IMAGE_OFF);
+            if (previewImageMode != null && previewImageMode.equals(previewImageModeOverride)) {
+                return;
+            }
+            applyPreviewImageMode(previewImageMode, true);
+            return;
+        }
+
         if ("pref_thumbnails".equals(key)
                 || "pref_show_points".equals(key)
                 || "pref_show_comments_count".equals(key)
                 || "pref_show_index".equals(key)
                 || "pref_left_align".equals(key)
                 || "pref_hotness".equals(key)
-                || SettingsUtils.PREF_STORY_PREVIEW_IMAGE_MODE.equals(key)
                 || "pref_compact_view".equals(key)) {
             updatePreview(true);
         }
@@ -158,6 +177,9 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         commentsIcon = itemView.findViewById(R.id.story_comments_icon);
         smallPreviewImage = itemView.findViewById(R.id.story_preview_image_small);
         largePreviewImage = itemView.findViewById(R.id.story_preview_image_large);
+        previewDetailsRow = itemView instanceof ViewGroup && ((ViewGroup) itemView).getChildCount() > 1
+                ? ((ViewGroup) itemView).getChildAt(1)
+                : null;
         storyTitle = itemView.findViewById(R.id.story_title);
         storyIndex = itemView.findViewById(R.id.story_index);
         storyMeta = itemView.findViewById(R.id.story_meta);
@@ -226,6 +248,16 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         updatePreview(null, null, null, null, null, null, null, null, animate);
     }
 
+    private void applyPreviewImageMode(String previewImageMode, boolean animate) {
+        previewImageModeOverride = previewImageMode;
+        if (animate && previewRoot != null && ViewCompat.isLaidOut(previewRoot)) {
+            animatePreviewImageMode(previewImageMode);
+            return;
+        }
+        updatePreview(null, null, null, null, null, null, null, previewImageMode, false);
+        requestPreviewRemeasure();
+    }
+
     private void updatePreview(
             Boolean showThumbnailsOverride,
             Boolean showPointsOverride,
@@ -234,8 +266,32 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
             Boolean leftAlignOverride,
             Boolean compactOverride,
             Integer hotnessOverride,
-            String previewImageModeOverride,
+            String previewImageModeOverrideParam,
             boolean animate) {
+        updatePreview(
+                showThumbnailsOverride,
+                showPointsOverride,
+                showCommentsCountOverride,
+                showIndexOverride,
+                leftAlignOverride,
+                compactOverride,
+                hotnessOverride,
+                previewImageModeOverrideParam,
+                animate,
+                true);
+    }
+
+    private void updatePreview(
+            Boolean showThumbnailsOverride,
+            Boolean showPointsOverride,
+            Boolean showCommentsCountOverride,
+            Boolean showIndexOverride,
+            Boolean leftAlignOverride,
+            Boolean compactOverride,
+            Integer hotnessOverride,
+            String previewImageModeOverrideParam,
+            boolean animate,
+            boolean syncHeight) {
         if (previewRoot == null) {
             return;
         }
@@ -261,8 +317,10 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         int hotness = hotnessOverride != null
                 ? hotnessOverride
                 : SettingsUtils.getPreferredHotness(getContext());
-        String previewImageMode = previewImageModeOverride != null
-                ? previewImageModeOverride
+        String previewImageMode = previewImageModeOverrideParam != null
+                ? previewImageModeOverrideParam
+                : this.previewImageModeOverride != null
+                ? this.previewImageModeOverride
                 : SettingsUtils.getPreferredStoryPreviewImageMode(getContext());
         if (animate) {
             beginPreviewTransition();
@@ -285,9 +343,228 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         updatePoints(showPoints, animate);
         updateCommentCount(showCommentsCount, compact, animate);
         updateHotnessIcon(hotness, animate);
+        if (syncHeight) {
+            syncPreviewContainerHeight(previewImageMode);
+        }
+    }
+
+    private void animatePreviewImageMode(String previewImageMode) {
+        if (previewHeightAnimator != null) {
+            previewHeightAnimator.cancel();
+        }
+
+        PreviewHeights startHeights = getCurrentPreviewHeights();
+        updatePreview(null, null, null, null, null, null, null, previewImageMode, false, false);
+        PreviewHeights targetHeights = calculatePreviewHeights(previewImageMode);
+        if (!targetHeights.isValid()) {
+            syncPreviewContainerHeight(previewImageMode);
+            requestPreviewRemeasure();
+            return;
+        }
+
+        if (!startHeights.isValid()) {
+            startHeights = targetHeights;
+        }
+        applyPreviewHeights(startHeights);
+
+        PreviewHeights animationStartHeights = startHeights;
+        previewHeightAnimator = ValueAnimator.ofFloat(0f, 1f);
+        previewHeightAnimator.setDuration(PREVIEW_ANIMATION_DURATION_MS);
+        previewHeightAnimator.setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f));
+        previewHeightAnimator.addUpdateListener(animation -> {
+            float progress = (float) animation.getAnimatedValue();
+            applyPreviewHeights(new PreviewHeights(
+                    lerp(animationStartHeights.contentHeight, targetHeights.contentHeight, progress),
+                    lerp(animationStartHeights.containerHeight, targetHeights.containerHeight, progress),
+                    lerp(animationStartHeights.rootHeight, targetHeights.rootHeight, progress)));
+        });
+        previewHeightAnimator.start();
+    }
+
+    private void syncPreviewContainerHeight(String previewImageMode) {
+        PreviewHeights heights = calculatePreviewHeights(previewImageMode);
+        if (heights.isValid()) {
+            applyPreviewHeights(heights);
+        }
+    }
+
+    private PreviewHeights getCurrentPreviewHeights() {
+        if (previewItemContainer == null || previewItemContainer.getChildCount() == 0 || previewRoot == null) {
+            return PreviewHeights.invalid();
+        }
+
+        View previewItem = previewItemContainer.getChildAt(0);
+        return new PreviewHeights(
+                previewItem.getHeight(),
+                previewItemContainer.getHeight(),
+                previewRoot.getHeight());
+    }
+
+    private PreviewHeights calculatePreviewHeights(String previewImageMode) {
+        if (previewItemContainer == null || previewItemContainer.getChildCount() == 0 || previewRoot == null) {
+            return PreviewHeights.invalid();
+        }
+
+        int containerWidth = previewItemContainer.getWidth()
+                - previewItemContainer.getPaddingLeft()
+                - previewItemContainer.getPaddingRight();
+        if (containerWidth <= 0) {
+            return PreviewHeights.invalid();
+        }
+
+        boolean showLargePreview = SettingsUtils.STORY_PREVIEW_IMAGE_LARGE.equals(previewImageMode);
+        int targetContentHeight = measurePreviewDetailsRowHeight(containerWidth)
+                + (showLargePreview ? getLayoutOuterHeight(largePreviewImage) : 0);
+        int targetContainerHeight = targetContentHeight
+                + previewItemContainer.getPaddingTop()
+                + previewItemContainer.getPaddingBottom();
+        int previewHeaderHeight = previewRoot.getChildCount() > 0
+                ? getOuterHeight(previewRoot.getChildAt(0))
+                : 0;
+        int targetRootHeight = targetContainerHeight
+                + previewHeaderHeight
+                + previewRoot.getPaddingTop()
+                + previewRoot.getPaddingBottom();
+        return new PreviewHeights(targetContentHeight, targetContainerHeight, targetRootHeight);
+    }
+
+    private void applyPreviewHeights(PreviewHeights heights) {
+        if (previewItemContainer == null || previewItemContainer.getChildCount() == 0 || previewRoot == null || !heights.isValid()) {
+            return;
+        }
+
+        View previewItem = previewItemContainer.getChildAt(0);
+        setExactHeight(previewItem, heights.contentHeight);
+        setExactHeight(previewItemContainer, heights.containerHeight);
+        previewRoot.setMinimumHeight(heights.rootHeight);
+        if (boundItemView != null) {
+            boundItemView.setMinimumHeight(heights.rootHeight);
+        }
+        requestPreviewRemeasure();
+    }
+
+    private void setExactHeight(View view, int height) {
+        if (view == null || height <= 0) {
+            return;
+        }
+
+        ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+        if (layoutParams != null && layoutParams.height != height) {
+            layoutParams.height = height;
+            view.setLayoutParams(layoutParams);
+        }
+        view.setMinimumHeight(height);
+    }
+
+    private int lerp(int start, int end, float progress) {
+        return Math.round(start + (end - start) * progress);
+    }
+
+    private int measurePreviewDetailsRowHeight(int containerWidth) {
+        if (previewDetailsRow == null) {
+            return 0;
+        }
+
+        int widthSpec = View.MeasureSpec.makeMeasureSpec(containerWidth, View.MeasureSpec.EXACTLY);
+        int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        previewDetailsRow.measure(widthSpec, heightSpec);
+        int measuredHeight = getOuterHeight(previewDetailsRow);
+        if (measuredHeight > 0) {
+            previewDetailsRowHeight = measuredHeight;
+            return measuredHeight;
+        }
+
+        int currentHeight = getOuterHeight(previewDetailsRow);
+        if (currentHeight > 0) {
+            previewDetailsRowHeight = currentHeight;
+            return currentHeight;
+        }
+
+        return Math.max(0, previewDetailsRowHeight);
+    }
+
+    private int getOuterHeight(View view) {
+        if (view == null || view.getVisibility() == View.GONE) {
+            return 0;
+        }
+
+        int height = view.getMeasuredHeight();
+        ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+        if (layoutParams != null && layoutParams.height > 0) {
+            height = layoutParams.height;
+        }
+        if (layoutParams instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams margins = (ViewGroup.MarginLayoutParams) layoutParams;
+            height += margins.topMargin + margins.bottomMargin;
+        }
+        return height;
+    }
+
+    private static class PreviewHeights {
+        final int contentHeight;
+        final int containerHeight;
+        final int rootHeight;
+
+        PreviewHeights(int contentHeight, int containerHeight, int rootHeight) {
+            this.contentHeight = contentHeight;
+            this.containerHeight = containerHeight;
+            this.rootHeight = rootHeight;
+        }
+
+        static PreviewHeights invalid() {
+            return new PreviewHeights(0, 0, 0);
+        }
+
+        boolean isValid() {
+            return contentHeight > 0 && containerHeight > 0 && rootHeight > 0;
+        }
+    }
+
+    private int getLayoutOuterHeight(View view) {
+        if (view == null) {
+            return 0;
+        }
+
+        int height = 0;
+        ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+        if (layoutParams != null && layoutParams.height > 0) {
+            height = layoutParams.height;
+        } else {
+            height = view.getMeasuredHeight();
+        }
+        if (layoutParams instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams margins = (ViewGroup.MarginLayoutParams) layoutParams;
+            height += margins.topMargin + margins.bottomMargin;
+        }
+        return height;
+    }
+
+    private void requestPreviewRemeasure() {
+        if (previewItemContainer != null) {
+            previewItemContainer.requestLayout();
+        }
+        if (previewRoot != null) {
+            previewRoot.requestLayout();
+            ViewGroup settingsList = findAncestorOfType(previewRoot, RecyclerView.class);
+            if (settingsList != null) {
+                settingsList.requestLayout();
+            }
+        }
+        if (boundItemView != null) {
+            boundItemView.requestLayout();
+        }
     }
 
     private void beginPreviewTransition() {
+        if (previewRoot == null || !ViewCompat.isLaidOut(previewRoot)) {
+            return;
+        }
+
+        beginSettingsListTransition();
+        TransitionManager.beginDelayedTransition(previewRoot, createPreviewTransition());
+    }
+
+    private void beginSettingsListTransition() {
         if (previewRoot == null || !ViewCompat.isLaidOut(previewRoot)) {
             return;
         }
@@ -296,7 +573,6 @@ public class StoryContentPreviewPreference extends Preference implements SharedP
         if (settingsList != null && ViewCompat.isLaidOut(settingsList)) {
             TransitionManager.beginDelayedTransition(settingsList, createSettingsListTransition());
         }
-        TransitionManager.beginDelayedTransition(previewRoot, createPreviewTransition());
     }
 
     private ChangeBounds createSettingsListTransition() {
