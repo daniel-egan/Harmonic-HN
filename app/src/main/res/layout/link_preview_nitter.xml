@@ -165,12 +165,12 @@
             android:textColor="#eee"
             app:backgroundTint="#000"
             android:elevation="2dp"
-            android:text="Open in app"
+            android:text="Open on X"
             android:layout_marginBottom="4dp"
             style="@style/Widget.Material3Expressive.Button.IconButton.Filled"
             android:layout_width="wrap_content"
             android:layout_gravity="right"
-            app:iconPadding="20dp"
+            app:iconPadding="16dp"
             android:layout_height="52dp"/>
 
     </LinearLayout>

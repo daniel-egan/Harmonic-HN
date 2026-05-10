@@ -182,6 +182,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private final static int COMMENT_ACTION_DOWNVOTE = 8;
     private final static int COMMENT_ACTION_REPLY = 9;
     private static final int NITTER_LINK_PREVIEW_MAX_ATTEMPTS = 4;
+    private static final long NITTER_LINK_PREVIEW_PAGE_LOAD_TIMEOUT_MS = 6000;
     private static final long NITTER_LINK_PREVIEW_HTML_READ_TIMEOUT_MS = 2500;
     private static final long[] NITTER_LINK_PREVIEW_RETRY_DELAYS_MS = {500, 1500, 3000};
 
@@ -1236,10 +1237,16 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             webView.getSettings().setUseWideViewPort(true);
         }
 
+        if (NitterGetter.isConvertibleToNitter(url) && SettingsUtils.shouldRedirectNitter(getContext())) {
+            url = NitterGetter.convertToNitterUrl(url);
+        }
+
+        String nitterPreviewUrl = null;
         boolean loadingNitterPreview = story != null
                 && story.nitterInfo == null
                 && shouldLoadNitterLinkPreview(url);
         if (loadingNitterPreview) {
+            nitterPreviewUrl = url;
             setLinkPreviewLoading(true);
         } else if (story != null
                 && story.linkPreviewLoading
@@ -1249,11 +1256,11 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             setLinkPreviewLoading(false);
         }
 
-        if (NitterGetter.isConvertibleToNitter(url) && SettingsUtils.shouldRedirectNitter(getContext())) {
-            url = NitterGetter.convertToNitterUrl(url);
-        }
-
+        int nitterPreviewGeneration = nitterLinkPreviewGeneration;
         webView.loadUrl(url);
+        if (nitterPreviewUrl != null) {
+            scheduleNitterLinkPreviewPageLoadTimeout(webView, nitterPreviewUrl, nitterPreviewGeneration);
+        }
         if (OFFLINE_PAGE_URL.equals(url)) {
             showingErrorPage = true;
             showingCachedArticlePage = false;
@@ -1805,14 +1812,28 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     }
 
     private boolean shouldLoadNitterLinkPreview(String url) {
-        return NitterGetter.isConvertibleToNitter(url)
+        return shouldReadNitterLinkPreview(url)
+                || (NitterGetter.isConvertibleToNitter(url)
                 && SettingsUtils.shouldRedirectNitter(getContext())
+                && SettingsUtils.shouldUseLinkPreviewX(getContext()));
+    }
+
+    private boolean shouldReadNitterLinkPreview(String url) {
+        return NitterGetter.isValidNitterUrl(url)
                 && SettingsUtils.shouldUseLinkPreviewX(getContext());
     }
 
     private void cancelPendingNitterLinkPreviewRead() {
         nitterLinkPreviewGeneration++;
         nitterLinkPreviewHandler.removeCallbacksAndMessages(null);
+    }
+
+    private void scheduleNitterLinkPreviewPageLoadTimeout(WebView view, String url, int generation) {
+        nitterLinkPreviewHandler.postDelayed(() -> {
+            if (isCurrentNitterLinkPreviewRead(view, url, generation)) {
+                readNitterLinkPreviewAttempt(view, url, generation, 0);
+            }
+        }, NITTER_LINK_PREVIEW_PAGE_LOAD_TIMEOUT_MS);
     }
 
     private void readNitterLinkPreviewWithRetry(WebView view, String url) {
@@ -1827,6 +1848,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private void readNitterLinkPreviewAttempt(WebView view, String url, int generation, int attempt) {
         Context context = getContext();
         if (context == null || !isCurrentNitterLinkPreviewRead(view, url, generation)) {
+            return;
+        }
+        if (!isWebViewAtNitterLinkPreviewUrl(view, url)) {
+            onNitterLinkPreviewReadFailed(view, url, generation, attempt);
             return;
         }
 
@@ -1883,6 +1908,64 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 && story != null
                 && story.nitterInfo == null
                 && NitterGetter.isValidNitterUrl(url);
+    }
+
+    private boolean isWebViewAtNitterLinkPreviewUrl(WebView view, String expectedUrl) {
+        String currentUrl = view.getUrl();
+        if (TextUtils.isEmpty(currentUrl) || !NitterGetter.isValidNitterUrl(currentUrl)) {
+            return false;
+        }
+
+        String expectedStatusId = getNitterStatusId(expectedUrl);
+        String currentStatusId = getNitterStatusId(currentUrl);
+        if (!TextUtils.isEmpty(expectedStatusId) && !TextUtils.isEmpty(currentStatusId)) {
+            return expectedStatusId.equals(currentStatusId);
+        }
+
+        return areSameNitterPage(currentUrl, expectedUrl);
+    }
+
+    @Nullable
+    private String getNitterStatusId(String url) {
+        try {
+            List<String> segments = Uri.parse(url).getPathSegments();
+            for (int i = 0; i < segments.size() - 1; i++) {
+                if ("status".equals(segments.get(i))) {
+                    return segments.get(i + 1);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private boolean areSameNitterPage(String firstUrl, String secondUrl) {
+        try {
+            Uri first = Uri.parse(firstUrl);
+            Uri second = Uri.parse(secondUrl);
+            return TextUtils.equals(normalizeHost(first.getHost()), normalizeHost(second.getHost()))
+                    && TextUtils.equals(trimTrailingSlash(first.getPath()), trimTrailingSlash(second.getPath()));
+        } catch (Exception ignored) {
+            return TextUtils.equals(firstUrl, secondUrl);
+        }
+    }
+
+    private String normalizeHost(@Nullable String host) {
+        if (host == null) {
+            return "";
+        }
+        host = host.toLowerCase(java.util.Locale.ROOT);
+        return host.startsWith("www.") ? host.substring(4) : host;
+    }
+
+    private String trimTrailingSlash(@Nullable String path) {
+        if (TextUtils.isEmpty(path) || "/".equals(path)) {
+            return "";
+        }
+        while (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return path;
     }
 
     private void maybeLoadPollOptions() {
@@ -3113,7 +3196,7 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 });
             }
 
-            if (NitterGetter.isValidNitterUrl(url) && SettingsUtils.shouldUseLinkPreviewX(getContext())) {
+            if (shouldReadNitterLinkPreview(url)) {
                 readNitterLinkPreviewWithRetry(view, url);
             }
         }
