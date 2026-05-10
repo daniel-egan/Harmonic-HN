@@ -243,6 +243,7 @@
         android:orientation="vertical">
 
         <ImageView
+            android:id="@+id/stories_header_no_bookmarks_icon"
             android:src="@drawable/ic_action_bookmark_border"
             android:contentDescription="@null"
             android:importantForAccessibility="no"
@@ -250,6 +251,7 @@
             android:layout_height="48dp"    />
 
         <TextView
+            android:id="@+id/stories_header_no_bookmarks_text"
             android:gravity="center"
             android:paddingTop="4dp"
             android:paddingBottom="36dp"

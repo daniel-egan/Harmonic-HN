@@ -91,6 +91,10 @@ public class Story {
         bundle.putString(CommentsFragment.EXTRA_TEXT, text);
         bundle.putBoolean(CommentsFragment.EXTRA_IS_LINK, isLink);
         bundle.putBoolean(CommentsFragment.EXTRA_IS_COMMENT, isComment);
+        bundle.putInt(CommentsFragment.EXTRA_PARENT_ID, parentId);
+        bundle.putInt(CommentsFragment.EXTRA_COMMENT_MASTER_ID, commentMasterId);
+        bundle.putString(CommentsFragment.EXTRA_COMMENT_MASTER_TITLE, commentMasterTitle);
+        bundle.putString(CommentsFragment.EXTRA_COMMENT_MASTER_URL, commentMasterUrl);
 
         return bundle;
     }

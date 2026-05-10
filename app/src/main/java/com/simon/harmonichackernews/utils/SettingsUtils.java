@@ -19,10 +19,12 @@ public class SettingsUtils {
     public static final String PREF_MONOCHROME_COMMENT_DEPTH = "pref_monochrome_comment_depth";
     public static final String PREF_STORY_DISPLAY_STYLE = "pref_story_display_style";
     public static final String PREF_COMMENT_DISPLAY_STYLE = "pref_comment_display_style";
+    public static final String PREF_BOOKMARKS_ENABLED = "pref_bookmarks_enabled";
     public static final String STORY_DISPLAY_STYLE_STANDARD = "standard";
     public static final String STORY_DISPLAY_STYLE_CARD = "card";
     public static final String COMMENT_DISPLAY_STYLE_STANDARD = STORY_DISPLAY_STYLE_STANDARD;
     public static final String COMMENT_DISPLAY_STYLE_CARD = STORY_DISPLAY_STYLE_CARD;
+    public static final String FAVORITES_LABEL = "Favorites";
 
     public static Set<Integer> readIntSetFromSharedPreferences(Context ctx, String key) {
         SharedPreferences sharedPref = ctx.getSharedPreferences(GLOBAL_SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
@@ -293,6 +295,10 @@ public class SettingsUtils {
         return getBooleanPref("pref_show_changelog", true, ctx);
     }
 
+    public static boolean shouldUseBookmarks(Context ctx) {
+        return getBooleanPref(PREF_BOOKMARKS_ENABLED, true, ctx);
+    }
+
     public static boolean shouldSwapCommentLongPressTap(Context ctx) {
         return getBooleanPref("pref_comments_swap_long", false, ctx);
     }
@@ -352,6 +358,10 @@ public class SettingsUtils {
         }
         // fallback
         return sortingOptions.length - 1;
+    }
+
+    public static int getFavoritesIndex(Resources res) {
+        return getBookmarksIndex(res) + 1;
     }
 
     public static int getJobsIndex(Resources res) {

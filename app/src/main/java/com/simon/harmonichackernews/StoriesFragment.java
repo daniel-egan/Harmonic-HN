@@ -22,6 +22,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.Spinner;
@@ -74,8 +75,15 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import okhttp3.Response;
 
 public class StoriesFragment extends Fragment {
 
@@ -106,12 +114,15 @@ public class StoriesFragment extends Fragment {
     private TextView loadingFailedText;
     private TextView loadingFailedAlgoliaLayout;
     private LinearLayout noBookmarksLayout;
+    private ImageView noBookmarksImage;
+    private TextView noBookmarksText;
     private TextView showingCachedText;
     private LinearLayout searchEmptyContainer;
     private Button retryButton;
     private Button showCachedButton;
 
     private StoryRecyclerViewAdapter adapter;
+    private ArrayAdapter<CharSequence> typeSpinnerAdapter;
     private List<Story> stories;
     private RequestQueue queue;
     private final Object requestTag = new Object();
@@ -130,6 +141,7 @@ public class StoriesFragment extends Fragment {
     private int searchMinimumCommentsIndex = 0;
     private boolean searchOnlyClicked = false;
     private int algoliaRequestGeneration = 0;
+    private int storyListGeneration = 0;
     private boolean algoliaLoading = false;
     private String activeAlgoliaUrl = null;
     private List<Story> storiesBeforeSearch = null;
@@ -177,6 +189,9 @@ public class StoriesFragment extends Fragment {
     private boolean predictiveSearchBackLoadingFailedServerError = false;
     private boolean suppressNextSearchRestoreAnimations = false;
     private boolean skipNextSearchRestoreDataSwap = false;
+    private boolean favoritesDropdownVisible = false;
+    private boolean favoritesInitialLoadInProgress = false;
+    private RecyclerView.ItemAnimator defaultStoryItemAnimator;
 
     public StoriesFragment() {
         super(R.layout.fragment_stories);
@@ -230,6 +245,8 @@ public class StoriesFragment extends Fragment {
         loadingFailedText = view.findViewById(R.id.stories_header_loading_failed_text);
         loadingFailedAlgoliaLayout = view.findViewById(R.id.stories_header_loading_failed_algolia);
         noBookmarksLayout = view.findViewById(R.id.stories_header_no_bookmarks);
+        noBookmarksImage = view.findViewById(R.id.stories_header_no_bookmarks_icon);
+        noBookmarksText = view.findViewById(R.id.stories_header_no_bookmarks_text);
         showingCachedText = view.findViewById(R.id.stories_header_cached_stories_header);
         searchEmptyContainer = view.findViewById(R.id.stories_header_search_empty_container);
         retryButton = view.findViewById(R.id.stories_header_retry_button);
@@ -246,6 +263,7 @@ public class StoriesFragment extends Fragment {
         };
         recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(linearLayoutManager);
+        defaultStoryItemAnimator = recyclerView.getItemAnimator();
 
         stories = new ArrayList<>();
         filterWords = Utils.getFilterWords(requireContext());
@@ -354,9 +372,57 @@ public class StoriesFragment extends Fragment {
     }
 
     private int getPreferredTypeIndex() {
+        ArrayList<CharSequence> typeAdapterList = buildTypeAdapterList(getContext());
+        int preferredIndex = typeAdapterList.indexOf(SettingsUtils.getPreferredStoryType(getContext()));
+        return preferredIndex >= 0 ? preferredIndex : 0;
+    }
+
+    private ArrayList<CharSequence> buildTypeAdapterList(Context ctx) {
         String[] sortingOptions = getResources().getStringArray(R.array.sorting_options);
         ArrayList<CharSequence> typeAdapterList = new ArrayList<>(Arrays.asList(sortingOptions));
-        return typeAdapterList.indexOf(SettingsUtils.getPreferredStoryType(getContext()));
+        if (shouldShowFavoritesTab(ctx)) {
+            int favoritesIndex = Math.min(SettingsUtils.getBookmarksIndex(getResources()) + 1, typeAdapterList.size());
+            typeAdapterList.add(favoritesIndex, SettingsUtils.FAVORITES_LABEL);
+        }
+        return typeAdapterList;
+    }
+
+    private boolean shouldShowFavoritesTab(@Nullable Context ctx) {
+        return ctx != null && AccountUtils.hasAccountDetails(ctx);
+    }
+
+    private void refreshTypeSpinnerItemsIfNeeded() {
+        if (typeSpinnerAdapter == null || typeSpinner == null || adapter == null || getContext() == null) {
+            return;
+        }
+
+        CharSequence previousTypeLabel = getTypeLabel(adapter.type);
+        boolean shouldShowFavorites = shouldShowFavoritesTab(getContext());
+        if (favoritesDropdownVisible == shouldShowFavorites) {
+            return;
+        }
+
+        favoritesDropdownVisible = shouldShowFavorites;
+        typeSpinnerAdapter.clear();
+        typeSpinnerAdapter.addAll(buildTypeAdapterList(getContext()));
+        typeSpinnerAdapter.notifyDataSetChanged();
+
+        int newType = getTypeIndex(previousTypeLabel);
+        if (newType < 0) {
+            newType = 0;
+        }
+
+        CharSequence newTypeLabel = getTypeLabel(newType);
+        boolean typeChanged = !TextUtils.equals(previousTypeLabel, newTypeLabel);
+        if (adapter.type != newType || typeChanged) {
+            adapter.type = newType;
+            updateAdapterCommentRows();
+        }
+
+        typeSpinner.setSelection(newType);
+        if (typeChanged) {
+            attemptStoryTypeRefresh();
+        }
     }
 
     private void configureAppBarDragBehavior() {
@@ -452,18 +518,19 @@ public class StoriesFragment extends Fragment {
         closeSearchButton.setOnClickListener(view -> closeSearch(view));
 
         // Set up spinner
-        String[] sortingOptions = ctx.getResources().getStringArray(R.array.sorting_options);
-        ArrayList<CharSequence> typeAdapterList = new ArrayList<>(Arrays.asList(sortingOptions));
-        ArrayAdapter<CharSequence> spinnerAdapter = new ArrayAdapter<>(ctx, R.layout.spinner_top_layout, R.id.selection_dropdown_item_textview, typeAdapterList);
-        spinnerAdapter.setDropDownViewResource(R.layout.spinner_item_layout);
+        favoritesDropdownVisible = shouldShowFavoritesTab(ctx);
+        ArrayList<CharSequence> typeAdapterList = buildTypeAdapterList(ctx);
+        typeSpinnerAdapter = new ArrayAdapter<>(ctx, R.layout.spinner_top_layout, R.id.selection_dropdown_item_textview, typeAdapterList);
+        typeSpinnerAdapter.setDropDownViewResource(R.layout.spinner_item_layout);
 
-        typeSpinner.setAdapter(spinnerAdapter);
+        typeSpinner.setAdapter(typeSpinnerAdapter);
         typeSpinner.setSelection(getPreferredTypeIndex());
         typeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
                 if (i != adapter.type) {
                     adapter.type = i;
+                    updateAdapterCommentRows();
                     attemptStoryTypeRefresh();
                 }
             }
@@ -530,6 +597,13 @@ public class StoriesFragment extends Fragment {
         searchContainer.setVisibility(searching ? View.VISIBLE : View.GONE);
         searchOptionsScroll.setVisibility(searching ? View.VISIBLE : View.GONE);
 
+        boolean bookmarksType = isBookmarksType(adapter.type);
+        boolean favoritesType = isFavoritesType(adapter.type);
+        if (noBookmarksImage != null && noBookmarksText != null) {
+            noBookmarksImage.setImageResource(favoritesType ? R.drawable.ic_action_star : R.drawable.ic_action_bookmark_border);
+            noBookmarksText.setText(favoritesType ? "No favorites" : "No bookmarks");
+        }
+
         if (searching) {
             loadingIndicator.setVisibility(algoliaLoading ? View.VISIBLE : View.GONE);
             searchEditText.requestFocus();
@@ -545,10 +619,19 @@ public class StoriesFragment extends Fragment {
             searchEmptyContainer.setVisibility(showSearchEmpty ? View.VISIBLE : View.GONE);
             noBookmarksLayout.setVisibility(View.GONE);
         } else {
-            noBookmarksLayout.setVisibility((stories.isEmpty() && adapter.type == SettingsUtils.getBookmarksIndex(ctx.getResources())) ? View.VISIBLE : View.GONE);
+            boolean showEmptySavedList = stories.isEmpty()
+                    && !loadingFailed
+                    && !loadingFailedServerError
+                    && (bookmarksType || (favoritesType && !favoritesInitialLoadInProgress && !swipeRefreshLayout.isRefreshing()));
+            noBookmarksLayout.setVisibility(showEmptySavedList ? View.VISIBLE : View.GONE);
             searchEmptyContainer.setVisibility(View.GONE);
 
-            loadingIndicator.setVisibility(stories.isEmpty() && !loadingFailed && !loadingFailedServerError && (adapter.type != SettingsUtils.getBookmarksIndex(ctx.getResources())) ? View.VISIBLE : View.GONE);
+            boolean showLoading = stories.isEmpty()
+                    && !loadingFailed
+                    && !loadingFailedServerError
+                    && !bookmarksType
+                    && (!favoritesType || favoritesInitialLoadInProgress);
+            loadingIndicator.setVisibility(showLoading ? View.VISIBLE : View.GONE);
         }
 
         showingCachedText.setVisibility(showingCached && !searching ? View.VISIBLE : View.GONE);
@@ -801,6 +884,23 @@ public class StoriesFragment extends Fragment {
     }
 
     private void replaceStories(List<Story> newStories) {
+        replaceStories(newStories, false);
+    }
+
+    private void replaceStories(List<Story> newStories, boolean notifyDataSetChanged) {
+        if (notifyDataSetChanged) {
+            boolean detachedAdapter = detachAdapterForHardSwap();
+            stories.clear();
+            resetPaginationState();
+            stories.addAll(newStories);
+            if (detachedAdapter) {
+                recyclerView.setAdapter(adapter);
+            } else {
+                adapter.notifyDataSetChanged();
+            }
+            return;
+        }
+
         clearStories();
         stories.addAll(newStories);
 
@@ -808,6 +908,31 @@ public class StoriesFragment extends Fragment {
         if (newItemCount > 0) {
             adapter.notifyItemRangeInserted(0, newItemCount);
         }
+    }
+
+    private void endRecyclerViewAnimations() {
+        if (recyclerView != null && recyclerView.getItemAnimator() != null) {
+            recyclerView.getItemAnimator().endAnimations();
+        }
+    }
+
+    private boolean detachAdapterForHardSwap() {
+        if (recyclerView == null || adapter == null || recyclerView.getAdapter() != adapter) {
+            endRecyclerViewAnimations();
+            return false;
+        }
+
+        endRecyclerViewAnimations();
+        recyclerView.stopScroll();
+        for (int i = 0; i < recyclerView.getChildCount(); i++) {
+            View child = recyclerView.getChildAt(i);
+            child.animate().cancel();
+            child.clearAnimation();
+        }
+        recyclerView.getOverlay().clear();
+        recyclerView.setAdapter(null);
+        recyclerView.getRecycledViewPool().clear();
+        return true;
     }
 
     private void displayStorySnapshot(List<Story> snapshot,
@@ -852,7 +977,8 @@ public class StoriesFragment extends Fragment {
         loadPendingBeforeSearch = stories.isEmpty()
                 && !loadingFailed
                 && !loadingFailedServerError
-                && adapter.type != SettingsUtils.getBookmarksIndex(getResources());
+                && !isBookmarksType(adapter.type)
+                && !isFavoritesType(adapter.type);
     }
 
     private boolean restoreStoriesBeforeSearch() {
@@ -938,6 +1064,7 @@ public class StoriesFragment extends Fragment {
 
         adapter.paginationMode = paginationMode;
         adapter.visibleStoryCount = paginationMode ? PAGINATION_PAGE_SIZE : Integer.MAX_VALUE;
+        updateAdapterCommentRows();
 
         adapter.setOnLinkClickListener(position -> {
             if (position == RecyclerView.NO_POSITION) {
@@ -979,6 +1106,8 @@ public class StoriesFragment extends Fragment {
         });
 
         adapter.setOnCommentClickListener(this::clickedComments);
+        adapter.setOnCommentStoryClickListener(this::clickedCommentStory);
+        adapter.setOnCommentRepliesClickListener(this::clickedComments);
 
         // Set up pagination "Load More" button click listener
         adapter.setOnLoadMoreClickListener(v -> {
@@ -1014,7 +1143,9 @@ public class StoriesFragment extends Fragment {
 
                 Story story = stories.get(position);
                 boolean oldClicked = story.clicked;
-                boolean oldBookmarked = Utils.isBookmarked(ctx, story.id);
+                boolean bookmarksEnabled = SettingsUtils.shouldUseBookmarks(ctx);
+                boolean oldBookmarked = bookmarksEnabled && Utils.isBookmarked(ctx, story.id);
+                boolean oldFavorited = Utils.isFavorited(ctx, story.id);
                 History h = HistoriesUtils.INSTANCE.getHistorybyId(story.id);
 
                 popupMenu.getMenu().add("Upvote").setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
@@ -1042,21 +1173,73 @@ public class StoriesFragment extends Fragment {
                     }
                 });
 
-                popupMenu.getMenu().add(oldBookmarked ? "Remove bookmark" : "Bookmark").setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                if (bookmarksEnabled) {
+                    popupMenu.getMenu().add(oldBookmarked ? "Remove bookmark" : "Bookmark").setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                        @Override
+                        public boolean onMenuItemClick(@NonNull MenuItem item) {
+                            if (oldBookmarked) {
+                                Utils.removeBookmark(ctx, story.id);
+                                if (isBookmarksType(adapter.type)) {
+                                    stories.remove(story);
+                                    adapter.notifyItemRemoved(position);
+                                    return true;
+                                }
+                            } else {
+                                Utils.addBookmark(ctx, story.id);
+                            }
+
+                            adapter.notifyItemChanged(position);
+                            return true;
+                        }
+                    });
+                }
+
+                popupMenu.getMenu().add(oldFavorited ? "Remove favorite" : "Favorite").setIcon(oldFavorited ? R.drawable.ic_action_star_filled : R.drawable.ic_action_star).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
                     @Override
                     public boolean onMenuItemClick(@NonNull MenuItem item) {
-                        if (oldBookmarked) {
-                            Utils.removeBookmark(ctx, story.id);
-                            if (adapter.type == SettingsUtils.getBookmarksIndex(ctx.getResources())) {
-                                stories.remove(story);
-                                adapter.notifyItemRemoved(position);
-                                return true;
-                            }
-                        } else {
-                            Utils.addBookmark(ctx, story.id);
+                        if (!AccountUtils.hasAccountDetails(ctx)) {
+                            AccountUtils.showLoginPrompt(getParentFragmentManager());
+                            return true;
                         }
 
-                        adapter.notifyItemChanged(position);
+                        boolean newFavorited = !oldFavorited;
+                        int optimisticIndex = stories.indexOf(story);
+                        Utils.setFavorite(ctx, story.id, newFavorited);
+                        if (optimisticIndex >= 0) {
+                            if (oldFavorited && isFavoritesType(adapter.type)) {
+                                stories.remove(story);
+                                adapter.notifyItemRemoved(optimisticIndex);
+                                updateHeader();
+                            } else {
+                                adapter.notifyItemChanged(optimisticIndex);
+                            }
+                        }
+
+                        UserActions.setFavorite(ctx, story.id, !oldFavorited, getParentFragmentManager(), new UserActions.ActionCallback() {
+                            @Override
+                            public void onSuccess(Response response) {
+                            }
+
+                            @Override
+                            public void onFailure(String summary, String response) {
+                                Utils.setFavorite(ctx, story.id, oldFavorited);
+                                int currentIndex = stories.indexOf(story);
+                                if (oldFavorited && isFavoritesType(adapter.type) && currentIndex == -1) {
+                                    int restoreIndex = optimisticIndex >= 0 ? Math.min(optimisticIndex, stories.size()) : 0;
+                                    stories.add(restoreIndex, story);
+                                    adapter.notifyItemInserted(restoreIndex);
+                                    updateHeader();
+                                } else if (currentIndex >= 0) {
+                                    adapter.notifyItemChanged(currentIndex);
+                                }
+                                if (newFavorited) {
+                                    Toast.makeText(ctx, "Couldn't add favorite", Toast.LENGTH_SHORT).show();
+                                } else {
+                                    UserActions.showFailureDetailDialog(ctx, summary, response);
+                                    Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        });
                         return true;
                     }
                 });
@@ -1100,11 +1283,13 @@ public class StoriesFragment extends Fragment {
         boolean newHideJobs = SettingsUtils.shouldHideJobs(getContext());
         hideClicked = SettingsUtils.shouldHideClicked(getContext());
         alwaysOpenComments = SettingsUtils.shouldAlwaysOpenComments(getContext());
+        refreshTypeSpinnerItemsIfNeeded();
+        syncVisibleFavoritesWithLocalCache();
 
         long timeDiff = System.currentTimeMillis() - lastLoaded;
 
         // if more than 1 hr
-        if (timeDiff > 1000 * 60 * 60 && !searching && adapter.type != SettingsUtils.getBookmarksIndex(getResources()) && !currentTypeIsAlgolia()) {
+        if (timeDiff > 1000 * 60 * 60 && !searching && !isBookmarksType(adapter.type) && !isFavoritesType(adapter.type) && !currentTypeIsAlgolia()) {
             showUpdateButton();
         }
 
@@ -1194,6 +1379,11 @@ public class StoriesFragment extends Fragment {
         syncStoriesWithHistoriesIfNeeded();
     }
 
+    public void onAccountStateChanged() {
+        refreshTypeSpinnerItemsIfNeeded();
+        updateHeader();
+    }
+
     private void syncStoriesWithHistoriesIfNeeded() {
         long currentHistoriesChangeVersion = HistoriesUtils.INSTANCE.getChangeVersion();
         if (historiesChangeVersion == currentHistoriesChangeVersion || adapter == null || stories == null) {
@@ -1217,7 +1407,7 @@ public class StoriesFragment extends Fragment {
             return;
         }
 
-        if (adapter.type == SettingsUtils.getHistoryIndex(getResources())) {
+        if (isHistoryType(adapter.type)) {
             attemptRefresh();
             return;
         }
@@ -1245,6 +1435,7 @@ public class StoriesFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         if (queue != null) {
+            storyListGeneration++;
             queue.cancelAll(requestTag);
         }
     }
@@ -1272,6 +1463,20 @@ public class StoriesFragment extends Fragment {
         }
     }
 
+    private void clickedCommentStory(int position) {
+        if (position == RecyclerView.NO_POSITION) {
+            return;
+        }
+
+        Story story = stories.get(position);
+        int targetId = story.commentMasterId > 0 ? story.commentMasterId : story.parentId;
+        if (targetId > 0) {
+            Utils.openCommentsActivity(targetId, -1, requireContext());
+        } else {
+            clickedComments(position);
+        }
+    }
+
     private void markStoryClicked(Story story) {
         if (!searchOnlyClicked) {
             story.clicked = true;
@@ -1280,7 +1485,11 @@ public class StoriesFragment extends Fragment {
     }
 
     private void loadStory(Story story, final int attempt) {
-        if (story.loaded || attempt >= 3) {
+        loadStory(story, attempt, storyListGeneration);
+    }
+
+    private void loadStory(Story story, final int attempt, final int loadGeneration) {
+        if (story.loaded || attempt >= 3 || !isCurrentStoryListGeneration(loadGeneration)) {
             return;
         }
 
@@ -1288,13 +1497,23 @@ public class StoriesFragment extends Fragment {
 
         StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
                 response -> {
+                    if (!isCurrentStoryListGeneration(loadGeneration)) {
+                        return;
+                    }
                     int index = stories.indexOf(story);
+                    if (index < 0) {
+                        return;
+                    }
                     try {
-                        if (!JSONParser.updateStoryWithHNJson(response, story, adapter.type == SettingsUtils.getHistoryIndex(getResources()))) {
+                        if (!JSONParser.updateStoryWithHNJson(response, story, isHistoryType(adapter.type))) {
                             stories.remove(story);
                             adapter.notifyItemRemoved(index);
                             loadedTo = Math.max(-1, loadedTo - 1);
                             return;
+                        }
+
+                        if (story.isComment && currentTypeUsesCommentRows()) {
+                            loadCommentMaster(story, story.parentId, 0, loadGeneration);
                         }
 
                         // lets check if we should remove the post because of filter
@@ -1341,10 +1560,16 @@ public class StoriesFragment extends Fragment {
                         }
                     }
                 }, error -> {
+            if (!isCurrentStoryListGeneration(loadGeneration)) {
+                return;
+            }
             error.printStackTrace();
             story.loadingFailed = true;
-            adapter.notifyItemChanged(stories.indexOf(story));
-            loadStory(story, attempt + 1);
+            int index = stories.indexOf(story);
+            if (index >= 0) {
+                adapter.notifyItemChanged(index);
+                loadStory(story, attempt + 1, loadGeneration);
+            }
         });
 
         stringRequest.setTag(requestTag);
@@ -1363,6 +1588,7 @@ public class StoriesFragment extends Fragment {
                         AccountUtils.showLoginPrompt(requireActivity().getSupportFragmentManager());
                     } else {
                         AccountUtils.deleteAccountDetails(requireActivity());
+                        refreshTypeSpinnerItemsIfNeeded();
                         Toast.makeText(getContext(), "Logged out", Toast.LENGTH_SHORT).show();
                     }
                 } else if (item.getItemId() == R.id.menu_profile) {
@@ -1412,6 +1638,17 @@ public class StoriesFragment extends Fragment {
         activeAlgoliaUrl = null;
     }
 
+    private int beginStoryListRefresh() {
+        storyListGeneration++;
+        invalidateAlgoliaLoad();
+        queue.cancelAll(requestTag);
+        return storyListGeneration;
+    }
+
+    private boolean isCurrentStoryListGeneration(int generation) {
+        return generation == storyListGeneration;
+    }
+
     private void attemptRefresh(boolean showSwipeRefreshIndicator) {
         attemptRefresh(showSwipeRefreshIndicator, false);
     }
@@ -1426,14 +1663,15 @@ public class StoriesFragment extends Fragment {
         swipeRefreshLayout.setRefreshing(showSwipeRefreshIndicator && !showMainLoadingIndicator);
 
         // cancel all ongoing
-        invalidateAlgoliaLoad();
-        queue.cancelAll(requestTag);
+        int refreshGeneration = beginStoryListRefresh();
 
+        boolean favoritesTypeForRefresh = isFavoritesType(adapter.type);
         if (showMainLoadingIndicator) {
             loadingFailed = false;
             loadingFailedServerError = false;
             showingCached = false;
-            clearStories();
+            favoritesInitialLoadInProgress = favoritesTypeForRefresh;
+            replaceStories(new ArrayList<>(), true);
             appBarLayout.setExpanded(true, false);
             recyclerView.scrollToPosition(0);
             updateHeader();
@@ -1458,7 +1696,7 @@ public class StoriesFragment extends Fragment {
 
         lastLoaded = System.currentTimeMillis();
 
-        if (adapter.type == SettingsUtils.getBookmarksIndex(getResources())) {
+        if (isBookmarksType(adapter.type)) {
             // lets load bookmarks instead - or rather add empty stories with correct id:s and start loading them
             ArrayList<Story> refreshedStories = new ArrayList<>();
             showingCached = false;
@@ -1470,11 +1708,11 @@ public class StoriesFragment extends Fragment {
                 refreshedStories.add(s);
             }
 
-            replaceStories(refreshedStories);
+            replaceStories(refreshedStories, true);
 
             int initialLoadCount = Math.min(getInitialLoadCount(), stories.size());
             for (int i = 0; i < initialLoadCount; i++) {
-                loadStory(stories.get(i), 0);
+                loadStory(stories.get(i), 0, refreshGeneration);
                 loadedTo = i;
             }
 
@@ -1482,7 +1720,17 @@ public class StoriesFragment extends Fragment {
             swipeRefreshLayout.setRefreshing(false);
 
             return;
-        } else if (adapter.type == SettingsUtils.getHistoryIndex(getResources())) {
+        } else if (isFavoritesType(adapter.type)) {
+            boolean shouldLoadCachedFavorites = showMainLoadingIndicator || stories.isEmpty();
+            boolean hasCachedFavorites = shouldLoadCachedFavorites
+                    ? loadFavoriteCache()
+                    : !Utils.loadFavorites(getContext(), true).isEmpty();
+            if (!shouldLoadCachedFavorites) {
+                resumeInterruptedStoryLoads();
+            }
+            syncFavoritesFromServer(showSwipeRefreshIndicator || hasCachedFavorites);
+            return;
+        } else if (isHistoryType(adapter.type)) {
             ArrayList<Story> refreshedStories = new ArrayList<>();
             showingCached = false;
             List<History> histories = UtilsKt.INSTANCE.loadHistories(requireContext(), true);
@@ -1492,11 +1740,11 @@ public class StoriesFragment extends Fragment {
                 refreshedStories.add(s);
             }
 
-            replaceStories(refreshedStories);
+            replaceStories(refreshedStories, true);
 
             int initialLoadCount = Math.min(getInitialLoadCount(), stories.size());
             for (int i = 0; i < initialLoadCount; i++) {
-                loadStory(stories.get(i), 0);
+                loadStory(stories.get(i), 0, refreshGeneration);
                 loadedTo = i;
             }
 
@@ -1509,6 +1757,9 @@ public class StoriesFragment extends Fragment {
         // if none of the above, do a normal loading
         StringRequest stringRequest = new StringRequest(Request.Method.GET, hnUrls[adapter.type == 0 ? 0 : adapter.type - 3],
                 response -> {
+                    if (!isCurrentStoryListGeneration(refreshGeneration)) {
+                        return;
+                    }
                     swipeRefreshLayout.setRefreshing(false);
                     try {
                         JSONArray jsonArray = new JSONArray(response);
@@ -1545,13 +1796,16 @@ public class StoriesFragment extends Fragment {
                         int storiesToLoad = Math.min(getInitialLoadCount(), stories.size());
                         for (int i = 0; i < storiesToLoad; i++) {
                             loadedTo = i;
-                            loadStory(stories.get(i), 0);
+                            loadStory(stories.get(i), 0, refreshGeneration);
                         }
 
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
                 }, error -> {
+            if (!isCurrentStoryListGeneration(refreshGeneration)) {
+                return;
+            }
             swipeRefreshLayout.setRefreshing(false);
             loadingFailed = true;
             updateHeader();
@@ -1560,6 +1814,268 @@ public class StoriesFragment extends Fragment {
         updateHeader();
         stringRequest.setTag(requestTag);
         queue.add(stringRequest);
+    }
+
+    private void loadCommentMaster(Story story, int parentId, int attempt) {
+        loadCommentMaster(story, parentId, attempt, storyListGeneration);
+    }
+
+    private void loadCommentMaster(Story story, int parentId, int attempt, int loadGeneration) {
+        if (parentId <= 0 || attempt >= 8 || story.commentMasterId > 0 || !isCurrentStoryListGeneration(loadGeneration)) {
+            return;
+        }
+
+        String url = "https://hacker-news.firebaseio.com/v0/item/" + parentId + ".json";
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                response -> {
+                    if (!isCurrentStoryListGeneration(loadGeneration)) {
+                        return;
+                    }
+                    try {
+                        if (TextUtils.isEmpty(response) || "null".equals(response)) {
+                            return;
+                        }
+
+                        JSONObject parent = new JSONObject(response);
+                        String parentType = parent.optString("type");
+                        if ("comment".equals(parentType)) {
+                            loadCommentMaster(story, parent.optInt("parent", 0), attempt + 1, loadGeneration);
+                            return;
+                        }
+
+                        story.commentMasterId = parent.optInt("id", parentId);
+                        story.commentMasterTitle = parent.optString("title", "Hacker News thread");
+                        if (parent.has("url")) {
+                            story.commentMasterUrl = parent.optString("url");
+                        } else {
+                            story.commentMasterUrl = "https://news.ycombinator.com/item?id=" + story.commentMasterId;
+                        }
+
+                        int index = stories.indexOf(story);
+                        if (index >= 0) {
+                            adapter.notifyItemChanged(index);
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }, error -> {
+            if (attempt < 2 && isCurrentStoryListGeneration(loadGeneration)) {
+                loadCommentMaster(story, parentId, attempt + 1, loadGeneration);
+            }
+        });
+
+        stringRequest.setTag(requestTag);
+        queue.add(stringRequest);
+    }
+
+    private boolean loadFavoriteCache() {
+        showingCached = false;
+        loadingFailed = false;
+        loadingFailedServerError = false;
+        favoritesInitialLoadInProgress = false;
+
+        ArrayList<Integer> favoriteIds = loadCachedFavoriteIds(getContext());
+        replaceFavoriteStoriesWithIds(favoriteIds);
+        return !favoriteIds.isEmpty();
+    }
+
+    private void syncFavoritesFromServer(boolean showSwipeRefreshIndicator) {
+        Context ctx = getContext();
+        if (ctx == null) {
+            swipeRefreshLayout.setRefreshing(false);
+            favoritesInitialLoadInProgress = false;
+            updateHeader();
+            return;
+        }
+
+        if (!AccountUtils.hasAccountDetails(ctx)) {
+            AccountUtils.showLoginPrompt(getParentFragmentManager());
+            swipeRefreshLayout.setRefreshing(false);
+            favoritesInitialLoadInProgress = false;
+            loadingFailed = stories.isEmpty();
+            updateHeader();
+            return;
+        }
+
+        favoritesInitialLoadInProgress = stories.isEmpty() && !showSwipeRefreshIndicator;
+        swipeRefreshLayout.setRefreshing(showSwipeRefreshIndicator);
+        updateHeader();
+
+        final int syncGeneration = storyListGeneration;
+        UserActions.fetchFavorites(ctx, new UserActions.FavoritesCallback() {
+            @Override
+            public void onSuccess(List<Integer> favoriteIds) {
+                if (!isAdded()
+                        || adapter == null
+                        || !isFavoritesType(adapter.type)
+                        || !isCurrentStoryListGeneration(syncGeneration)) {
+                    return;
+                }
+
+                Context currentContext = getContext();
+                if (currentContext == null) {
+                    return;
+                }
+
+                ArrayList<Integer> normalizedFavoriteIds = normalizeFavoriteIds(favoriteIds);
+                if (!favoriteIdsMatchCache(currentContext, normalizedFavoriteIds)) {
+                    Utils.saveFavoriteIds(currentContext, normalizedFavoriteIds);
+                }
+                syncFavoriteStoriesToIds(normalizedFavoriteIds);
+
+                favoritesInitialLoadInProgress = false;
+                loadingFailed = false;
+                loadingFailedServerError = false;
+                swipeRefreshLayout.setRefreshing(false);
+                updateHeader();
+            }
+
+            @Override
+            public void onFailure(String summary, String response) {
+                if (!isAdded()
+                        || adapter == null
+                        || !isFavoritesType(adapter.type)
+                        || !isCurrentStoryListGeneration(syncGeneration)) {
+                    return;
+                }
+
+                swipeRefreshLayout.setRefreshing(false);
+                favoritesInitialLoadInProgress = false;
+                loadingFailed = stories.isEmpty();
+                updateHeader();
+                Toast.makeText(requireContext(), summary, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private boolean favoriteIdsMatchCache(Context ctx, List<Integer> favoriteIds) {
+        ArrayList<Bookmark> cachedFavorites = Utils.loadFavorites(ctx, true);
+        ArrayList<Integer> normalizedFavoriteIds = normalizeFavoriteIds(favoriteIds);
+
+        if (cachedFavorites.size() != normalizedFavoriteIds.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < cachedFavorites.size(); i++) {
+            if (cachedFavorites.get(i).id != normalizedFavoriteIds.get(i)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private ArrayList<Integer> loadCachedFavoriteIds(@Nullable Context ctx) {
+        ArrayList<Integer> favoriteIds = new ArrayList<>();
+        if (ctx == null) {
+            return favoriteIds;
+        }
+
+        ArrayList<Bookmark> favorites = Utils.loadFavorites(ctx, true);
+        for (Bookmark favorite : favorites) {
+            if (!favoriteIds.contains(favorite.id)) {
+                favoriteIds.add(favorite.id);
+            }
+        }
+
+        Collections.sort(favoriteIds, (id1, id2) -> Integer.compare(id2, id1));
+        return favoriteIds;
+    }
+
+    private void syncVisibleFavoritesWithLocalCache() {
+        if (adapter == null || stories == null || !isFavoritesType(adapter.type)) {
+            return;
+        }
+
+        syncFavoriteStoriesToIds(loadCachedFavoriteIds(getContext()));
+    }
+
+    private boolean syncFavoriteStoriesToIds(List<Integer> favoriteIds) {
+        if (favoriteIdsMatchVisibleStories(favoriteIds)) {
+            return false;
+        }
+
+        boolean removed = removeStoriesNotInFavoriteIds(favoriteIds);
+        if (!favoriteIdsMatchVisibleStories(favoriteIds)) {
+            replaceFavoriteStoriesWithIds(favoriteIds);
+            return true;
+        }
+
+        if (removed) {
+            updateHeader();
+        }
+        return removed;
+    }
+
+    private boolean favoriteIdsMatchVisibleStories(List<Integer> favoriteIds) {
+        if (stories.size() != favoriteIds.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < stories.size(); i++) {
+            if (stories.get(i).id != favoriteIds.get(i)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean removeStoriesNotInFavoriteIds(List<Integer> favoriteIds) {
+        Set<Integer> favoriteIdSet = new HashSet<>(favoriteIds);
+        boolean removed = false;
+
+        for (int i = stories.size() - 1; i >= 0; i--) {
+            if (!favoriteIdSet.contains(stories.get(i).id)) {
+                stories.remove(i);
+                adapter.notifyItemRemoved(i);
+                removed = true;
+            }
+        }
+
+        if (removed) {
+            loadedTo = Math.min(loadedTo, stories.size() - 1);
+        }
+
+        return removed;
+    }
+
+    private void replaceFavoriteStoriesWithIds(List<Integer> favoriteIds) {
+        Map<Integer, Story> existingStories = new HashMap<>();
+        for (Story story : stories) {
+            existingStories.put(story.id, story);
+        }
+
+        ArrayList<Story> refreshedStories = new ArrayList<>();
+        for (int id : favoriteIds) {
+            Story existingStory = existingStories.get(id);
+            refreshedStories.add(existingStory != null ? existingStory : new Story("Loading...", id, false, false));
+        }
+
+        queue.cancelAll(requestTag);
+        replaceStories(refreshedStories, true);
+        loadInitialVisibleStories();
+        updateHeader();
+    }
+
+    private ArrayList<Integer> normalizeFavoriteIds(List<Integer> favoriteIds) {
+        ArrayList<Integer> normalizedFavoriteIds = new ArrayList<>();
+        for (int id : favoriteIds) {
+            if (!normalizedFavoriteIds.contains(id)) {
+                normalizedFavoriteIds.add(id);
+            }
+        }
+
+        Collections.sort(normalizedFavoriteIds, (id1, id2) -> Integer.compare(id2, id1));
+        return normalizedFavoriteIds;
+    }
+
+    private void loadInitialVisibleStories() {
+        int initialLoadCount = Math.min(getInitialLoadCount(), stories.size());
+        for (int i = 0; i < initialLoadCount; i++) {
+            loadStory(stories.get(i), 0);
+            loadedTo = i;
+        }
     }
 
     private void updateSearchStatus() {
@@ -1577,6 +2093,7 @@ public class StoriesFragment extends Fragment {
             saveStoriesBeforeSearch();
 
             // cancel all ongoing
+            storyListGeneration++;
             invalidateAlgoliaLoad();
             queue.cancelAll(requestTag);
             swipeRefreshLayout.setRefreshing(false);
@@ -1590,6 +2107,7 @@ public class StoriesFragment extends Fragment {
                     && storiesBeforeSearch.isEmpty();
             loadPendingBeforeSearch = false;
 
+            storyListGeneration++;
             invalidateAlgoliaLoad();
             queue.cancelAll(requestTag);
             swipeRefreshLayout.setRefreshing(false);
@@ -1667,6 +2185,7 @@ public class StoriesFragment extends Fragment {
     }
 
     private void loadOnlyClickedSearch(String query) {
+        storyListGeneration++;
         invalidateAlgoliaLoad();
         final int requestGeneration = algoliaRequestGeneration;
         algoliaLoading = true;
@@ -1988,6 +2507,72 @@ public class StoriesFragment extends Fragment {
 
     public boolean currentTypeIsAlgolia() {
         return 0 < adapter.type && 4 > adapter.type;
+    }
+
+    private boolean isBookmarksType(int type) {
+        return TextUtils.equals(getTypeLabel(type), "Bookmarks");
+    }
+
+    private boolean isHistoryType(int type) {
+        return TextUtils.equals(getTypeLabel(type), "History");
+    }
+
+    private boolean isFavoritesType(int type) {
+        return TextUtils.equals(getTypeLabel(type), SettingsUtils.FAVORITES_LABEL);
+    }
+
+    private boolean currentTypeUsesCommentRows() {
+        return isBookmarksType(adapter.type) || isFavoritesType(adapter.type);
+    }
+
+    @Nullable
+    private CharSequence getTypeLabel(int type) {
+        if (type < 0) {
+            return null;
+        }
+
+        if (typeSpinnerAdapter != null && type < typeSpinnerAdapter.getCount()) {
+            return typeSpinnerAdapter.getItem(type);
+        }
+
+        Context ctx = getContext();
+        if (ctx == null) {
+            return null;
+        }
+
+        ArrayList<CharSequence> typeAdapterList = buildTypeAdapterList(ctx);
+        return type < typeAdapterList.size() ? typeAdapterList.get(type) : null;
+    }
+
+    private int getTypeIndex(@Nullable CharSequence label) {
+        if (label == null || typeSpinnerAdapter == null) {
+            return -1;
+        }
+
+        for (int i = 0; i < typeSpinnerAdapter.getCount(); i++) {
+            if (TextUtils.equals(label, typeSpinnerAdapter.getItem(i))) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private void updateAdapterCommentRows() {
+        boolean usesCommentRows = adapter != null && currentTypeUsesCommentRows();
+        if (adapter != null) {
+            adapter.allowCommentRows = usesCommentRows;
+            adapter.disableClickedEffects = isBookmarksType(adapter.type) || isFavoritesType(adapter.type) || isHistoryType(adapter.type);
+        }
+        if (recyclerView != null) {
+            if (recyclerView.getItemAnimator() != null) {
+                recyclerView.getItemAnimator().endAnimations();
+            }
+            recyclerView.stopScroll();
+            if (recyclerView.getItemAnimator() == null && defaultStoryItemAnimator != null) {
+                recyclerView.setItemAnimator(defaultStoryItemAnimator);
+            }
+        }
     }
 
     private boolean shouldHideStoryAsJob(Story story) {

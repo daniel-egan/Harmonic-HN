@@ -166,6 +166,14 @@ public class MainActivity extends BaseActivity implements StoriesFragment.StoryC
         }
     }
 
+    public void onAccountStateChanged() {
+        StoriesFragment fragment = (StoriesFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.main_fragment_stories_container);
+        if (fragment != null) {
+            fragment.onAccountStateChanged();
+        }
+    }
+
     private void showUpdateDialog() {
         AlertDialog dialog = new MaterialAlertDialogBuilder(this)
                 .setTitle("Changelog")

@@ -27,6 +27,7 @@ import org.jsoup.nodes.Element;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,6 +47,8 @@ public class UserActions {
 private static final String BASE_WEB_URL = "https://news.ycombinator.com";
 private static final String LOGIN_PATH = "login";
 private static final String VOTE_PATH = "vote";
+private static final String FAVE_PATH = "fave";
+private static final String FAVORITES_PATH = "favorites";
 private static final String COMMENT_PATH = "comment";
 private static final String SUBMIT_PATH = "submit";
 private static final String ITEM_PATH = "item";
@@ -55,6 +58,7 @@ private static final String LOGIN_PARAM_PW = "pw";
 private static final String LOGIN_PARAM_CREATING = "creating";
 private static final String LOGIN_PARAM_GOTO = "goto";
 private static final String ITEM_PARAM_ID = "id";
+private static final String COMMENTS_PARAM = "comments";
 private static final String VOTE_PARAM_ID = "id";
 private static final String VOTE_PARAM_HOW = "how";
 private static final String COMMENT_PARAM_PARENT = "parent";
@@ -70,6 +74,7 @@ private static final String VOTE_DIR_UN = "un";
 private static final String DEFAULT_REDIRECT = "news";
 private static final String CREATING_TRUE = "t";
 private static final String DEFAULT_FNOP = "submit-page";
+private static final String TRUE_VALUE = "t";
 private static final String DEFAULT_SUBMIT_REDIRECT = "newest";
 private static final String REGEX_INPUT = "<\\s*input[^>]*>";
 private static final String REGEX_VALUE = "value[^\"]*\"([^\"]*)\"";
@@ -80,6 +85,7 @@ private static final String HEADER_SET_COOKIE = "set-cookie";
 private static final String CAPTCHA_VALIDATION_TEXT = "Validation required. If this doesn't work, you can email";
 private static final String CAPTCHA_RESPONSE_PARAM = "g-recaptcha-response";
 private static final long MAX_RESPONSE_PREVIEW_BYTES = 1024 * 1024;
+private static final int MAX_FAVORITES_PAGES = 50;
 
     public static void voteWithDir(Context ctx, int id, FragmentManager fm, String dir) {
         UserActions.vote(String.valueOf(id), dir, ctx, fm, new UserActions.ActionCallback() {
@@ -112,6 +118,291 @@ private static final long MAX_RESPONSE_PREVIEW_BYTES = 1024 * 1024;
 
     public static void unvote(Context ctx, int id, FragmentManager fm) {
         voteWithDir(ctx, id, fm, VOTE_DIR_UN);
+    }
+
+    public static void setFavorite(Context ctx, int id, boolean favorite, FragmentManager fm) {
+        setFavorite(ctx, id, favorite, fm, new ActionCallback() {
+            @Override
+            public void onSuccess(Response response) {
+                Toast.makeText(ctx, favorite ? "Added favorite" : "Removed favorite", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFailure(String summary, String response) {
+                UserActions.showFailureDetailDialog(ctx, summary, response);
+                Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    public static void setFavorite(Context ctx, int id, boolean favorite, FragmentManager fm, ActionCallback cb) {
+        Triple<String, String, Integer> account = AccountUtils.getAccountDetails(ctx);
+        if (AccountUtils.handlePossibleError(account, fm, ctx)) {
+            return;
+        }
+
+        login(ctx, new ActionCallback() {
+            @Override
+            public void onSuccess(Response response) {
+                response.close();
+                fetchFavoriteActionLink(ctx, id, favorite, cb);
+            }
+
+            @Override
+            public void onFailure(String summary, String response) {
+                cb.onFailure(summary, response);
+            }
+
+            @Override
+            public void onCaptchaRequired(CaptchaChallenge challenge) {
+                cb.onCaptchaRequired(challenge);
+            }
+        });
+    }
+
+    public static void fetchFavorites(Context ctx, FavoritesCallback cb) {
+        Triple<String, String, Integer> account = AccountUtils.getAccountDetails(ctx);
+        if (AccountUtils.handlePossibleError(account, null, ctx)) {
+            cb.onFailure("Login required", "Save your Hacker News login before syncing favorites.");
+            return;
+        }
+
+        OkHttpClient client = NetworkComponent.getOkHttpClientInstance();
+        Handler main = new Handler(ctx.getMainLooper());
+        ArrayList<Integer> favoriteIds = new ArrayList<>();
+
+        fetchFavoritesPage(
+                client,
+                buildFavoritesUrl(account.getFirst(), false),
+                favoriteIds,
+                1,
+                main,
+                new FavoritesCallback() {
+                    @Override
+                    public void onSuccess(List<Integer> ids) {
+                        fetchFavoritesPage(
+                                client,
+                                buildFavoritesUrl(account.getFirst(), true),
+                                ids,
+                                1,
+                                main,
+                                cb);
+                    }
+
+                    @Override
+                    public void onFailure(String summary, String response) {
+                        cb.onFailure(summary, response);
+                    }
+                });
+    }
+
+    private static String buildFavoritesUrl(String username, boolean comments) {
+        HttpUrl.Builder builder = Objects.requireNonNull(HttpUrl.parse(BASE_WEB_URL))
+                .newBuilder()
+                .addPathSegment(FAVORITES_PATH)
+                .addQueryParameter("id", username);
+
+        if (comments) {
+            builder.addQueryParameter(COMMENTS_PARAM, TRUE_VALUE);
+        }
+
+        return builder.build().toString();
+    }
+
+    private static void fetchFavoritesPage(OkHttpClient client,
+                                           String url,
+                                           List<Integer> favoriteIds,
+                                           int page,
+                                           Handler main,
+                                           FavoritesCallback cb) {
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                main.post(() -> cb.onFailure("Couldn't sync favorites", e.getMessage()));
+            }
+
+            @Override
+            public void onResponse(@NotNull Call call, @NotNull Response response) {
+                if (!response.isSuccessful()) {
+                    String failure = response.toString();
+                    response.close();
+                    main.post(() -> cb.onFailure("Couldn't sync favorites", failure));
+                    return;
+                }
+
+                try {
+                    String body = response.body() == null ? "" : response.body().string();
+                    Document document = Jsoup.parse(body, BASE_WEB_URL + "/");
+                    for (Element item : document.select("tr.athing[id]")) {
+                        String idString = item.attr("id");
+                        if (TextUtils.isDigitsOnly(idString)) {
+                            int id = Integer.parseInt(idString);
+                            if (!favoriteIds.contains(id)) {
+                                favoriteIds.add(id);
+                            }
+                        }
+                    }
+
+                    Element moreLink = document.selectFirst("a.morelink[href]");
+                    String nextPage = moreLink == null ? null : moreLink.absUrl("href");
+                    if (!TextUtils.isEmpty(nextPage) && page < MAX_FAVORITES_PAGES) {
+                        fetchFavoritesPage(client, nextPage, favoriteIds, page + 1, main, cb);
+                    } else {
+                        main.post(() -> cb.onSuccess(favoriteIds));
+                    }
+                } catch (Exception e) {
+                    main.post(() -> cb.onFailure("Couldn't parse favorites", e.getMessage()));
+                }
+            }
+        });
+    }
+
+    private static void fetchFavoriteActionLink(Context ctx, int id, boolean favorite, ActionCallback cb) {
+        Handler main = new Handler(ctx.getMainLooper());
+        HttpUrl url = Objects.requireNonNull(HttpUrl.parse(BASE_WEB_URL))
+                .newBuilder()
+                .addPathSegment(ITEM_PATH)
+                .addQueryParameter(ITEM_PARAM_ID, String.valueOf(id))
+                .build();
+
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        NetworkComponent.getOkHttpClientInstanceWithCookies().newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                main.post(() -> cb.onFailure("Couldn't load HN item", e.getMessage()));
+            }
+
+            @Override
+            public void onResponse(@NotNull Call call, @NotNull Response response) {
+                if (!response.isSuccessful()) {
+                    String failure = response.toString();
+                    response.close();
+                    main.post(() -> cb.onFailure("Couldn't load HN item", failure));
+                    return;
+                }
+
+                try {
+                    String body = response.body() == null ? "" : response.body().string();
+                    if (body.contains("Bad login.")) {
+                        AccountUtils.deleteAccountDetails(ctx);
+                        main.post(() -> cb.onFailure("Bad login",
+                                "Your session has expired or credentials are invalid. Logged out."));
+                        return;
+                    }
+
+                    if (isCaptchaRequired(body)) {
+                        CaptchaChallenge challenge = parseCaptchaChallenge(body, true);
+                        if (challenge != null) {
+                            main.post(() -> cb.onCaptchaRequired(challenge));
+                        } else {
+                            main.post(() -> cb.onFailure("Captcha parsing error", "HN asked for a captcha, but Harmonic could not read the challenge form."));
+                        }
+                        return;
+                    }
+
+                    FavoriteLinkResult linkResult = findFavoriteLink(body, favorite);
+                    if (linkResult.alreadyDesiredState) {
+                        if (favorite) {
+                            Utils.addFavorite(ctx, id);
+                        } else {
+                            Utils.removeFavorite(ctx, id);
+                        }
+                        main.post(() -> cb.onSuccess(response));
+                        return;
+                    }
+
+                    if (TextUtils.isEmpty(linkResult.actionUrl)) {
+                        main.post(() -> cb.onFailure("Favorite unavailable", "HN did not return a favorite action for this item."));
+                        return;
+                    }
+
+                    Request favoriteRequest = new Request.Builder()
+                            .url(linkResult.actionUrl)
+                            .build();
+
+                    executeRequest(ctx, favoriteRequest, new ActionCallback() {
+                        @Override
+                        public void onSuccess(Response response) {
+                            if (favorite) {
+                                Utils.addFavorite(ctx, id);
+                            } else {
+                                Utils.removeFavorite(ctx, id);
+                            }
+                            cb.onSuccess(response);
+                        }
+
+                        @Override
+                        public void onFailure(String summary, String response) {
+                            cb.onFailure(summary, response);
+                        }
+
+                        @Override
+                        public void onCaptchaRequired(CaptchaChallenge challenge) {
+                            cb.onCaptchaRequired(challenge);
+                        }
+                    }, true);
+                } catch (Exception e) {
+                    main.post(() -> cb.onFailure("Couldn't parse favorite action", e.getMessage()));
+                }
+            }
+        });
+    }
+
+    private static FavoriteLinkResult findFavoriteLink(String body, boolean favorite) {
+        Document document = Jsoup.parse(body, BASE_WEB_URL + "/");
+        FavoriteLinkResult result = new FavoriteLinkResult();
+
+        for (Element link : document.select("a[href]")) {
+            String href = link.attr("href");
+            if (TextUtils.isEmpty(href)
+                    || (!href.startsWith(FAVE_PATH) && !href.contains("/" + FAVE_PATH))) {
+                continue;
+            }
+
+            String label = link.text().trim().toLowerCase(Locale.US);
+            String normalizedLabel = label.replace("-", "").replace(" ", "");
+            boolean linkRemovesFavorite = normalizedLabel.contains("unfavorite");
+            boolean linkAddsFavorite = normalizedLabel.contains("favorite") && !linkRemovesFavorite;
+
+            if (favorite && linkAddsFavorite) {
+                result.actionUrl = link.absUrl("href");
+                return result;
+            }
+
+            if (!favorite && (linkAddsFavorite || linkRemovesFavorite)) {
+                result.actionUrl = buildFavoriteRemovalUrl(link.absUrl("href"));
+                return result;
+            }
+
+            if (favorite && linkRemovesFavorite) {
+                result.alreadyDesiredState = true;
+            }
+        }
+
+        return result;
+    }
+
+    private static String buildFavoriteRemovalUrl(String actionUrl) {
+        HttpUrl parsed = HttpUrl.parse(actionUrl);
+        if (parsed == null) {
+            return actionUrl;
+        }
+
+        if (parsed.queryParameter("un") != null) {
+            return actionUrl;
+        }
+
+        return parsed.newBuilder()
+                .addQueryParameter("un", TRUE_VALUE)
+                .build()
+                .toString();
     }
 
 
@@ -550,5 +841,15 @@ private static final long MAX_RESPONSE_PREVIEW_BYTES = 1024 * 1024;
         default void onCaptchaRequired(CaptchaChallenge challenge) {
             onFailure("Captcha required", "HN requires a captcha for this action. Please try again in a browser.");
         }
+    }
+
+    public interface FavoritesCallback {
+        void onSuccess(List<Integer> favoriteIds);
+        void onFailure(String summary, String response);
+    }
+
+    private static class FavoriteLinkResult {
+        String actionUrl;
+        boolean alreadyDesiredState;
     }
 }

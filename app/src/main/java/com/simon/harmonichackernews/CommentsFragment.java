@@ -140,6 +140,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import okhttp3.Call;
+import okhttp3.Response;
 
 public class CommentsFragment extends Fragment implements CommentsRecyclerViewAdapter.CommentClickListener, CommentsRecyclerViewAdapter.RequestSummaryCallback, CommentsRecyclerViewAdapter.RetryListener {
 
@@ -156,6 +157,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     public final static String EXTRA_TEXT = "com.simon.harmonichackernews.EXTRA_TEXT";
     public final static String EXTRA_IS_LINK = "com.simon.harmonichackernews.EXTRA_IS_LINK";
     public final static String EXTRA_IS_COMMENT = "com.simon.harmonichackernews.EXTRA_IS_COMMENT";
+    public final static String EXTRA_PARENT_ID = "com.simon.harmonichackernews.EXTRA_PARENT_ID";
+    public final static String EXTRA_COMMENT_MASTER_ID = "com.simon.harmonichackernews.EXTRA_COMMENT_MASTER_ID";
+    public final static String EXTRA_COMMENT_MASTER_TITLE = "com.simon.harmonichackernews.EXTRA_COMMENT_MASTER_TITLE";
+    public final static String EXTRA_COMMENT_MASTER_URL = "com.simon.harmonichackernews.EXTRA_COMMENT_MASTER_URL";
     public final static String EXTRA_FORWARD = "com.simon.harmonichackernews.EXTRA_FORWARD";
     public final static String EXTRA_SHOW_WEBSITE = "com.simon.harmonichackernews.EXTRA_SHOW_WEBSITE";
     private final static String PDF_MIME_TYPE = "application/pdf";
@@ -166,6 +171,16 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     private final static int PREDICTIVE_BACK_MAX_PEEK_DP = 70;
     private final static int COMMENT_NAVIGATION_SPEED_STEP = 35;
     private final static int SEARCH_SCROLL_TOP_MIN_VISIBLE_COMMENT = 10;
+    private final static int COMMENT_ACTION_VIEW_USER = 0;
+    private final static int COMMENT_ACTION_SHARE = 1;
+    private final static int COMMENT_ACTION_COPY = 2;
+    private final static int COMMENT_ACTION_SELECT = 3;
+    private final static int COMMENT_ACTION_BOOKMARK = 4;
+    private final static int COMMENT_ACTION_FAVORITE = 5;
+    private final static int COMMENT_ACTION_UPVOTE = 6;
+    private final static int COMMENT_ACTION_UNVOTE = 7;
+    private final static int COMMENT_ACTION_DOWNVOTE = 8;
+    private final static int COMMENT_ACTION_REPLY = 9;
 
     private BottomSheetFragmentCallback callback;
     private List<Comment> comments;
@@ -257,6 +272,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             story.text = bundle.getString(EXTRA_TEXT);
             story.isLink = bundle.getBoolean(EXTRA_IS_LINK, true);
             story.isComment = bundle.getBoolean(EXTRA_IS_COMMENT, false);
+            story.parentId = bundle.getInt(EXTRA_PARENT_ID, 0);
+            story.commentMasterId = bundle.getInt(EXTRA_COMMENT_MASTER_ID, 0);
+            story.commentMasterTitle = bundle.getString(EXTRA_COMMENT_MASTER_TITLE);
+            story.commentMasterUrl = bundle.getString(EXTRA_COMMENT_MASTER_URL);
             story.loaded = true;
 
             if (Utils.isTablet(getResources())) {
@@ -774,6 +793,10 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
 
                     case CommentsRecyclerViewAdapter.FLAG_ACTION_CLICK_VOTE:
                         clickVote();
+                        break;
+
+                    case CommentsRecyclerViewAdapter.FLAG_ACTION_CLICK_FAVORITE:
+                        clickFavorite();
                         break;
 
                     case CommentsRecyclerViewAdapter.FLAG_ACTION_CLICK_SHARE:
@@ -1371,6 +1394,9 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                 clearSearchedCommentScrollTopTarget();
                 adapter.notifyItemChanged(0);
             }
+        }
+        if (adapter != null) {
+            adapter.notifyItemChanged(0);
         }
         saveScreenHeight();
     }
@@ -2148,6 +2174,39 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         UserActions.upvote(getContext(), adapter.story.id, getParentFragmentManager());
     }
 
+    public void clickFavorite() {
+        Context ctx = getContext();
+        if (ctx == null || adapter == null) {
+            return;
+        }
+
+        boolean wasFavorited = Utils.isFavorited(ctx, adapter.story.id);
+        if (!AccountUtils.hasAccountDetails(ctx)) {
+            AccountUtils.showLoginPrompt(getParentFragmentManager());
+            return;
+        }
+
+        Utils.setFavorite(ctx, adapter.story.id, !wasFavorited);
+        adapter.notifyItemChanged(0);
+        UserActions.setFavorite(ctx, adapter.story.id, !wasFavorited, getParentFragmentManager(), new UserActions.ActionCallback() {
+            @Override
+            public void onSuccess(Response response) {
+            }
+
+            @Override
+            public void onFailure(String summary, String response) {
+                Utils.setFavorite(ctx, adapter.story.id, wasFavorited);
+                adapter.notifyItemChanged(0);
+                if (!wasFavorited) {
+                    Toast.makeText(ctx, "Couldn't add favorite", Toast.LENGTH_SHORT).show();
+                } else {
+                    UserActions.showFailureDetailDialog(ctx, summary, response);
+                    Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+
     private void smoothScrollTop() {
         if (layoutManager != null) {
             startCommentSmoothScrollWithScaledSpeed(0);
@@ -2498,29 +2557,39 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
     public void onItemClick(Comment comment, int pos, View view) {
         final Context ctx = getContext();
 
-        Pair[] items;
+        boolean bookmarksEnabled = SettingsUtils.shouldUseBookmarks(ctx);
+        boolean oldBookmarked = bookmarksEnabled && Utils.isBookmarked(ctx, comment.id);
+        boolean oldFavorited = Utils.isFavorited(ctx, comment.id);
 
-        if (Utils.timeInSecondsMoreThanTwoWeeksAgo(comment.time)) {
-            items = new Pair[]{
-                    new Pair<>("View user (" + comment.by + ")", R.drawable.ic_action_user),
-                    new Pair<>("Share comment link", R.drawable.ic_action_share),
-                    new Pair<>("Copy text", R.drawable.ic_action_copy),
-                    new Pair<>("Select text", R.drawable.ic_action_select),
-                    new Pair<>("Vote up", R.drawable.ic_action_thumbs_up),
-                    new Pair<>("Unvote", R.drawable.ic_action_thumbs),
-                    new Pair<>("Vote down", R.drawable.ic_action_thumb_down),
-            };
-        } else {
-            items = new Pair[]{
-                    new Pair<>("View user (" + comment.by + ")", R.drawable.ic_action_user),
-                    new Pair<>("Share comment link", R.drawable.ic_action_share),
-                    new Pair<>("Copy text", R.drawable.ic_action_copy),
-                    new Pair<>("Select text", R.drawable.ic_action_select),
-                    new Pair<>("Vote up", R.drawable.ic_action_thumbs_up),
-                    new Pair<>("Unvote", R.drawable.ic_action_thumbs),
-                    new Pair<>("Vote down", R.drawable.ic_action_thumb_down),
-                    new Pair<>("Reply", R.drawable.ic_action_reply)
-            };
+        ArrayList<Pair<String, Integer>> items = new ArrayList<>();
+        ArrayList<Integer> actions = new ArrayList<>();
+
+        items.add(new Pair<>("View user (" + comment.by + ")", R.drawable.ic_action_user));
+        actions.add(COMMENT_ACTION_VIEW_USER);
+        items.add(new Pair<>("Share comment link", R.drawable.ic_action_share));
+        actions.add(COMMENT_ACTION_SHARE);
+        items.add(new Pair<>("Copy text", R.drawable.ic_action_copy));
+        actions.add(COMMENT_ACTION_COPY);
+        items.add(new Pair<>("Select text", R.drawable.ic_action_select));
+        actions.add(COMMENT_ACTION_SELECT);
+
+        if (bookmarksEnabled) {
+            items.add(new Pair<>(oldBookmarked ? "Remove bookmark" : "Bookmark", oldBookmarked ? R.drawable.ic_action_bookmark_filled : R.drawable.ic_action_bookmark_border));
+            actions.add(COMMENT_ACTION_BOOKMARK);
+        }
+
+        items.add(new Pair<>(oldFavorited ? "Remove favorite" : "Favorite", oldFavorited ? R.drawable.ic_action_star_filled : R.drawable.ic_action_star));
+        actions.add(COMMENT_ACTION_FAVORITE);
+        items.add(new Pair<>("Vote up", R.drawable.ic_action_thumbs_up));
+        actions.add(COMMENT_ACTION_UPVOTE);
+        items.add(new Pair<>("Unvote", R.drawable.ic_action_thumbs));
+        actions.add(COMMENT_ACTION_UNVOTE);
+        items.add(new Pair<>("Vote down", R.drawable.ic_action_thumb_down));
+        actions.add(COMMENT_ACTION_DOWNVOTE);
+
+        if (!Utils.timeInSecondsMoreThanTwoWeeksAgo(comment.time)) {
+            items.add(new Pair<>("Reply", R.drawable.ic_action_reply));
+            actions.add(COMMENT_ACTION_REPLY);
         }
 
         ListAdapter adapter = new ArrayAdapter<Pair<String, Integer>>(ctx,
@@ -2530,8 +2599,11 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
             public View getView(int position, View convertView, ViewGroup parent) {
                 TextView view = (TextView) super.getView(position, convertView, parent);
 
-                view.setCompoundDrawablesWithIntrinsicBounds((Integer) items[position].second, 0, 0, 0);
-                view.setText((CharSequence) items[position].first);
+                Pair<String, Integer> item = getItem(position);
+                if (item != null) {
+                    view.setCompoundDrawablesWithIntrinsicBounds(item.second, 0, 0, 0);
+                    view.setText(item.first);
+                }
 
                 return view;
             }
@@ -2541,8 +2613,8 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
         builder.setAdapter(adapter, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                switch (which) {
-                    case 0: //view user
+                switch (actions.get(which)) {
+                    case COMMENT_ACTION_VIEW_USER:
 
                         UserDialogFragment.showUserDialog(requireActivity().getSupportFragmentManager(), comment.by, new UserDialogFragment.UserDialogCallback() {
                             @Override
@@ -2554,11 +2626,11 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                         });
 
                         break;
-                    case 1: //share comment
+                    case COMMENT_ACTION_SHARE:
                         ctx.startActivity(ShareUtils.getShareIntent(comment.id));
 
                         break;
-                    case 2: // copy text
+                    case COMMENT_ACTION_COPY:
                         ClipboardManager clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
                         ClipData clip = ClipData.newPlainText("Hacker News comment", Html.fromHtml(comment.text));
                         clipboard.setPrimaryClip(clip);
@@ -2568,23 +2640,53 @@ public class CommentsFragment extends Fragment implements CommentsRecyclerViewAd
                         }
 
                         break;
-                    case 3: //select text
+                    case COMMENT_ACTION_SELECT:
                         DialogUtils.showTextSelectionDialog(ctx, comment.text);
 
                         break;
-                    case 4: //upvote
+
+                    case COMMENT_ACTION_BOOKMARK:
+                        if (oldBookmarked) {
+                            Utils.removeBookmark(ctx, comment.id);
+                        } else {
+                            Utils.addBookmark(ctx, comment.id);
+                        }
+                        break;
+
+                    case COMMENT_ACTION_FAVORITE:
+                        if (!AccountUtils.hasAccountDetails(ctx)) {
+                            AccountUtils.showLoginPrompt(getParentFragmentManager());
+                            break;
+                        }
+
+                        Utils.setFavorite(ctx, comment.id, !oldFavorited);
+                        UserActions.setFavorite(ctx, comment.id, !oldFavorited, getParentFragmentManager(), new UserActions.ActionCallback() {
+                            @Override
+                            public void onSuccess(Response response) {
+                            }
+
+                            @Override
+                            public void onFailure(String summary, String response) {
+                                Utils.setFavorite(ctx, comment.id, oldFavorited);
+                                UserActions.showFailureDetailDialog(ctx, summary, response);
+                                Toast.makeText(ctx, "Couldn't update favorite", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                        break;
+
+                    case COMMENT_ACTION_UPVOTE:
                         UserActions.upvote(ctx, comment.id, getParentFragmentManager());
                         break;
 
-                    case 5: //unvote
+                    case COMMENT_ACTION_UNVOTE:
                         UserActions.unvote(ctx, comment.id, getParentFragmentManager());
                         break;
 
-                    case 6: //downvote
+                    case COMMENT_ACTION_DOWNVOTE:
                         UserActions.downvote(ctx, comment.id, getParentFragmentManager());
                         break;
 
-                    case 7: //reply
+                    case COMMENT_ACTION_REPLY:
                         if (!AccountUtils.hasAccountDetails(ctx)) {
                             AccountUtils.showLoginPrompt(getParentFragmentManager());
                             return;
