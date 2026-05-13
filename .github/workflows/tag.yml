@@ -19,7 +19,7 @@ jobs:
       - uses: gradle/gradle-build-action@v2
         with:
           arguments: build --warning-mode all
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: app/build/outputs/apk/release/app-release-unsigned.apk
